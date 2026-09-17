@@ -55,6 +55,41 @@ sebelum membuat pola baru.
 - Semantic colors hanya untuk status. Merah SIG adalah aksen brand, sedangkan
   merah error atau destructive harus tetap memiliki konteks dan label jelas.
 
+## Mobile Containment & Overflow
+
+Seluruh form PILOK harus tetap berada di dalam viewport pada lebar mobile dan
+tidak boleh membuat horizontal page scrolling.
+
+- Form control dan card menggunakan `width: 100%` dan `max-width: 100%`.
+- Child flex/grid yang memuat konten dinamis menggunakan `min-width: 0` agar
+  dapat menyusut mengikuti parent.
+- Track responsive grid menggunakan `minmax(0, 1fr)` ketika konten berpotensi
+  memperlebar kolom.
+- Nilai dinamis panjang seperti nama file, nama gudang, kode, URL, dan label
+  harus wrap atau truncate, bukan memperlebar parent.
+- Existing-document/file component ditumpuk vertikal pada layar kecil ketika
+  nama file dan aksi tidak dapat berada dalam satu baris secara nyaman.
+- Aksi primer dan sekunder harus tetap dapat dijangkau tanpa horizontal scroll.
+- Hindari fixed width untuk konten form pada mobile.
+- Jangan menggunakan global overflow hiding sebagai solusi utama untuk child
+  layout yang rusak.
+- Validasi layout sekurangnya pada lebar sekitar 320, 360, 375, 390, dan 430 px.
+
+### Long filenames
+
+- Container nama file harus shrinkable.
+- Gunakan ellipsis untuk state ringkas satu baris.
+- Aksi boleh berpindah ke bawah nama file pada mobile.
+- Sediakan nama file lengkap secara accessible melalui `title` atau mekanisme
+  setara jika memungkinkan.
+- Nama file tidak boleh menentukan lebar form atau card.
+
+### Responsive Form Rows
+
+Baris form multi-kolom harus menjadi satu kolom pada layar kecil. Setiap child
+harus dapat menyusut dengan `min-width: 0`; gunakan track
+`minmax(0, 1fr)` untuk menjaga konten tetap berada di dalam parent.
+
 ## Reuse pada form PILOK berikutnya
 
 Mulai dari FormShell, susun SectionCard, lalu tutup form dengan ActionBar.

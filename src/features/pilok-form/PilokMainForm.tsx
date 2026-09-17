@@ -126,7 +126,11 @@ export function PilokMainForm({
   const adaPerubahan = useWatch({ control, name: 'adaPerubahan' })
 
   return (
-    <form onSubmit={handleSubmit(submitForm)} noValidate className="space-y-6">
+    <form
+      onSubmit={handleSubmit(submitForm)}
+      noValidate
+      className="w-full min-w-0 max-w-full space-y-6"
+    >
       <SectionCard>
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <SectionHeader
@@ -143,7 +147,7 @@ export function PilokMainForm({
           </button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-3">
           <ReadonlyField label="Kode PILOK" value={pilok.kodePilok} />
           <ReadonlyField
             label="Distributor Group"
@@ -166,7 +170,7 @@ export function PilokMainForm({
         <input type="hidden" {...register('namaDistributor')} />
         <input type="hidden" {...register('areaName')} />
 
-        <fieldset className="mt-7 border-t border-slate-200 pt-6">
+        <fieldset className="mt-7 min-w-0 max-w-full border-t border-slate-200 pt-6">
           <legend className="text-sm font-semibold text-slate-900">
             Apakah Ada Perubahan? <span className="text-red-600">*</span>
           </legend>
@@ -228,7 +232,7 @@ export function PilokMainForm({
               belum dapat dikirim.
             </StatusBanner>
           ) : (
-            <div className="space-y-5">
+            <div className="w-full min-w-0 max-w-full space-y-5">
               {fields.map((field, index) => (
                 <WarehouseCard key={field.id} index={index} form={form} />
               ))}

@@ -43,6 +43,9 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
     name: `warehouses.${index}.buktiSewa`,
   })
   const warehouseErrors = errors.warehouses?.[index]
+  const shmFileName = newShm?.name ?? existingShm?.fileName
+  const rentalProofFileName =
+    newBuktiSewa?.name ?? existingBuktiSewa?.fileName
 
   const ownershipRegistration = register(
     `warehouses.${index}.kepemilikan`,
@@ -76,13 +79,13 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
   )
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
-      <div className="mb-5 flex items-center justify-between gap-4 border-b border-slate-200 pb-4">
+    <section className="w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+      <div className="mb-5 flex min-w-0 items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <h3 className="font-bold text-sig-ink">Gudang {index + 1}</h3>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div className="grid gap-4 sm:col-span-2 sm:grid-cols-3">
+      <div className="grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-5 sm:grid-cols-2">
+        <div className="grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 sm:col-span-2 sm:grid-cols-3">
           <ReadonlyField label="Kode Gudang" value={master.kodeGudang} />
           <ReadonlyField label="Nama Gudang" value={master.namaGudang} />
           <ReadonlyField
@@ -99,7 +102,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
           />
         </div>
 
-        <div>
+        <div className="min-w-0 max-w-full">
           <label htmlFor={`warehouse-${index}-status`} className={labelClass}>
             Status Gudang <span className="text-red-600">*</span>
           </label>
@@ -116,7 +119,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
           <FieldError message={warehouseErrors?.status?.message} />
         </div>
 
-        <div>
+        <div className="min-w-0 max-w-full">
           <label htmlFor={`warehouse-${index}-ownership`} className={labelClass}>
             Kepemilikan Gudang <span className="text-red-600">*</span>
           </label>
@@ -135,7 +138,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
         </div>
 
         {ownership === 'Milik Sendiri' && (
-          <div className="sm:col-span-2">
+          <div className="min-w-0 max-w-full sm:col-span-2">
             <label htmlFor={`warehouse-${index}-shm`} className={labelClass}>
               {existingShm ? 'Ganti PDF SHM' : 'Upload SHM'}{' '}
               <span className="text-red-600">*</span>
@@ -160,8 +163,11 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
                 )
                 return newShm || existingShm ? (
                   <div className="file-selected">
-                    <span className="min-w-0 truncate text-sm font-semibold text-emerald-800">
-                      ✓ {newShm?.name ?? existingShm?.fileName}
+                    <span
+                      className="block w-full min-w-0 max-w-full flex-1 truncate text-sm font-semibold text-emerald-800"
+                      title={shmFileName}
+                    >
+                      ✓ {shmFileName}
                     </span>
                     <div className="file-actions">
                       {!newShm && existingShm && (
@@ -190,7 +196,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
 
         {ownership === 'Sewa' && (
           <>
-            <div>
+            <div className="min-w-0 max-w-full">
               <label htmlFor={`warehouse-${index}-start`} className={labelClass}>
                 Mulai Sewa <span className="text-red-600">*</span>
               </label>
@@ -204,7 +210,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
               <FieldError message={warehouseErrors?.mulaiSewa?.message} />
             </div>
 
-            <div>
+            <div className="min-w-0 max-w-full">
               <label htmlFor={`warehouse-${index}-end`} className={labelClass}>
                 Berakhir Sewa <span className="text-red-600">*</span>
               </label>
@@ -219,7 +225,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
               <FieldError message={warehouseErrors?.berakhirSewa?.message} />
             </div>
 
-            <div className="sm:col-span-2">
+            <div className="min-w-0 max-w-full sm:col-span-2">
               <label
                 htmlFor={`warehouse-${index}-rental-proof`}
                 className={labelClass}
@@ -249,8 +255,11 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
                   )
                   return newBuktiSewa || existingBuktiSewa ? (
                     <div className="file-selected">
-                      <span className="min-w-0 truncate text-sm font-semibold text-emerald-800">
-                        ✓ {newBuktiSewa?.name ?? existingBuktiSewa?.fileName}
+                      <span
+                        className="block w-full min-w-0 max-w-full flex-1 truncate text-sm font-semibold text-emerald-800"
+                        title={rentalProofFileName}
+                      >
+                        ✓ {rentalProofFileName}
                       </span>
                       <div className="file-actions">
                         {!newBuktiSewa && existingBuktiSewa && (
