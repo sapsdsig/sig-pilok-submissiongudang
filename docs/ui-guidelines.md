@@ -16,9 +16,11 @@ sebelum membuat pola baru.
 
 - Gunakan FormShell untuk container, lebar konten, dan BrandHeader.
 - BrandHeader menampilkan logo SIG dan logo PILOK berdampingan pada header
-  putih. Aset defaultnya adalah `/branding/sig-logo-black.svg` dan
-  `/branding/pilok-logo-black.svg`.
-- Favicon seluruh form PILOK menggunakan `/branding/pilok-icon.svg`.
+  putih. Aset defaultnya adalah `/branding/sig-logo-red.svg` dan
+  `/branding/pilok-logo-red.svg`; varian hitam tetap tersedia untuk konteks
+  monokrom.
+- Favicon seluruh form PILOK menggunakan `/branding/pilok-icon.svg` dalam
+  warna merah SIG (`#f4313f`).
 - Aset logo bersumber dari halaman Corporate Identity resmi SIG:
   https://sig.id/identitas-perusahaan.
 - Pertahankan rasio, clear space, dan alt text kedua logo. Untuk varian header

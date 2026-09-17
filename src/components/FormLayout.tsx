@@ -12,9 +12,9 @@ interface BrandHeaderProps {
 export function BrandHeader({
   title,
   subtitle,
-  logoSrc = '/branding/sig-logo-black.svg',
+  logoSrc = '/branding/sig-logo-red.svg',
   logoAlt = 'Logo SIG',
-  pilokLogoSrc = '/branding/pilok-logo-black.svg',
+  pilokLogoSrc = '/branding/pilok-logo-red.svg',
   pilokLogoAlt = 'Logo PILOK',
 }: BrandHeaderProps) {
   return (
