@@ -15,11 +15,17 @@ sebelum membuat pola baru.
 ## Branding dan shell
 
 - Gunakan FormShell untuk container, lebar konten, dan BrandHeader.
-- Logo default adalah /branding/sig-logo-black.png pada header putih.
+- BrandHeader menampilkan logo SIG dan logo PILOK berdampingan pada header
+  putih. Aset defaultnya adalah `/branding/sig-logo-black.svg` dan
+  `/branding/pilok-logo-black.svg`.
+- Favicon seluruh form PILOK menggunakan `/branding/pilok-icon.svg`.
 - Aset logo bersumber dari halaman Corporate Identity resmi SIG:
   https://sig.id/identitas-perusahaan.
-- Pertahankan rasio, clear space, dan alt text Logo SIG. Untuk varian header
-  lain, ganti melalui prop logoSrc; jangan ubah artwork logo.
+- Pertahankan rasio, clear space, dan alt text kedua logo. Untuk varian header
+  lain, ganti melalui prop `logoSrc` dan `pilokLogoSrc`; jangan mengubah
+  artwork logo.
+- Pada mobile, grup logo tetap berdampingan dan boleh berada di atas blok judul
+  agar branding tidak mempersempit atau memperlebar konten header.
 - Format judul: PILOK - [Nama Form], diikuti satu kalimat deskripsi singkat.
 
 ## Section dan field

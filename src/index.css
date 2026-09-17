@@ -50,15 +50,24 @@
     @apply mx-auto flex w-full min-w-0 max-w-5xl items-center gap-5 px-4 py-6 sm:gap-7 sm:px-6 sm:py-8;
   }
 
-  .brand-logo-frame {
-    @apply relative h-14 w-24 shrink-0 overflow-hidden sm:h-16 sm:w-28;
+  .brand-logo-group {
+    @apply flex min-w-0 max-w-full shrink-0 items-center gap-3 sm:gap-4;
   }
 
-  .brand-logo-image {
-    @apply absolute max-w-none;
-    left: -73%;
-    top: -71%;
-    width: 245%;
+  .brand-logo {
+    @apply block h-auto max-w-full shrink-0 object-contain;
+  }
+
+  .brand-logo-sig {
+    @apply w-20 sm:w-24;
+  }
+
+  .brand-logo-pilok {
+    @apply w-24 sm:w-28;
+  }
+
+  .brand-logo-separator {
+    @apply h-8 w-px shrink-0 bg-slate-200 sm:h-10;
   }
 
   .brand-title-block {
@@ -248,15 +257,11 @@
 
   @media (max-width: 479px) {
     .brand-header-inner {
-      @apply items-start gap-4 py-5;
-    }
-
-    .brand-logo-frame {
-      @apply mt-1 h-11 w-[4.8125rem];
+      @apply flex-col items-start gap-4 py-5;
     }
 
     .brand-title-block {
-      @apply pl-4;
+      @apply w-full border-l-0 border-t border-slate-200 pt-4 pl-0;
     }
 
     .brand-title-block h1 {

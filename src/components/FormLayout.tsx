@@ -5,19 +5,33 @@ interface BrandHeaderProps {
   subtitle: string
   logoSrc?: string
   logoAlt?: string
+  pilokLogoSrc?: string
+  pilokLogoAlt?: string
 }
 
 export function BrandHeader({
   title,
   subtitle,
-  logoSrc = '/branding/sig-logo-black.png',
+  logoSrc = '/branding/sig-logo-black.svg',
   logoAlt = 'Logo SIG',
+  pilokLogoSrc = '/branding/pilok-logo-black.svg',
+  pilokLogoAlt = 'Logo PILOK',
 }: BrandHeaderProps) {
   return (
     <header className="brand-header">
       <div className="brand-header-inner">
-        <div className="brand-logo-frame">
-          <img className="brand-logo-image" src={logoSrc} alt={logoAlt} />
+        <div className="brand-logo-group">
+          <img
+            className="brand-logo brand-logo-sig"
+            src={logoSrc}
+            alt={logoAlt}
+          />
+          <span className="brand-logo-separator" aria-hidden="true" />
+          <img
+            className="brand-logo brand-logo-pilok"
+            src={pilokLogoSrc}
+            alt={pilokLogoAlt}
+          />
         </div>
         <div className="brand-title-block">
           <p className="brand-eyebrow">PILOK · Form Operasional</p>
