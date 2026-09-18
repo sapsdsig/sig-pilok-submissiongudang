@@ -10,6 +10,9 @@ import {
 import { pilokService } from '../../services/pilokService'
 import { pilokAccessSchema } from './schema'
 
+const MASTER_PILOK_URL =
+  'https://docs.google.com/spreadsheets/d/1vArPQ5kSl0NAxNQCem8XW1WwHOknD9HBaBEYlMnC4XQ/edit?usp=sharing'
+
 interface AccessValues {
   kodePilok: string
 }
@@ -63,6 +66,40 @@ export function PilokAccess({ onResolved }: PilokAccessProps) {
       </div>
 
       <form onSubmit={handleSubmit(resolvePilok)} noValidate>
+        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800">
+              Belum tahu kode PILOK Anda?
+            </p>
+            <p className="mt-1 text-sm leading-5 text-slate-600">
+              Cari kode distributor Anda pada daftar master PILOK.
+            </p>
+          </div>
+          <a
+            href={MASTER_PILOK_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="button-secondary w-full shrink-0 sm:w-auto"
+            aria-label="Lihat Master PILOK di tab baru"
+          >
+            Lihat Master PILOK
+            <svg
+              className="size-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M14 5h5v5M10 14 19 5M19 13v6H5V5h6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
+        </div>
+
         <label
           htmlFor="kodePilok"
           className="field-label"
