@@ -24,24 +24,31 @@ interface SubmittedWarehouseBase {
   kodeGudang: string
   namaGudang: string
   kapasitasGudang: number
-  status: WarehouseStatus
 }
 
 export interface OwnedWarehouseSubmission extends SubmittedWarehouseBase {
+  status: 'Aktif'
   kepemilikan: 'Milik Sendiri'
   shm: DriveDocumentReference
 }
 
 export interface RentedWarehouseSubmission extends SubmittedWarehouseBase {
+  status: 'Aktif'
   kepemilikan: 'Sewa'
   mulaiSewa: string
   berakhirSewa: string
   buktiSewa: DriveDocumentReference
 }
 
+export interface InactiveWarehouseSubmission extends SubmittedWarehouseBase {
+  status: 'Tidak Aktif'
+  kepemilikan: ''
+}
+
 export type WarehouseSubmission =
   | OwnedWarehouseSubmission
   | RentedWarehouseSubmission
+  | InactiveWarehouseSubmission
 
 export interface PilokSubmission {
   kodePilok: string
@@ -78,23 +85,30 @@ export interface ExistingSubmission {
 
 export interface OwnedWarehouseRequest {
   kodeGudang: string
-  status: WarehouseStatus
+  status: 'Aktif'
   kepemilikan: 'Milik Sendiri'
   shm: DriveDocumentReference
 }
 
 export interface RentedWarehouseRequest {
   kodeGudang: string
-  status: WarehouseStatus
+  status: 'Aktif'
   kepemilikan: 'Sewa'
   mulaiSewa: string
   berakhirSewa: string
   buktiSewa: DriveDocumentReference
 }
 
+export interface InactiveWarehouseRequest {
+  kodeGudang: string
+  status: 'Tidak Aktif'
+  kepemilikan: ''
+}
+
 export type WarehouseSubmissionRequest =
   | OwnedWarehouseRequest
   | RentedWarehouseRequest
+  | InactiveWarehouseRequest
 
 export interface PilokSubmissionRequest {
   kodePilok: string

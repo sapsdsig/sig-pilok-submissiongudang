@@ -62,6 +62,14 @@ export async function buildSubmissionPayload(
           throw new Error('Status Gudang tidak valid.')
         }
 
+        if (warehouse.status === 'Tidak Aktif') {
+          return {
+            kodeGudang: warehouse.kodeGudang.trim(),
+            status: 'Tidak Aktif',
+            kepemilikan: '',
+          }
+        }
+
         if (warehouse.kepemilikan === 'Milik Sendiri') {
           const shm = await resolveDocument({
             values,
@@ -75,7 +83,7 @@ export async function buildSubmissionPayload(
           })
           return {
             kodeGudang: warehouse.kodeGudang.trim(),
-            status: warehouse.status,
+            status: 'Aktif',
             kepemilikan: 'Milik Sendiri',
             shm,
           }
@@ -98,7 +106,7 @@ export async function buildSubmissionPayload(
           })
           return {
             kodeGudang: warehouse.kodeGudang.trim(),
-            status: warehouse.status,
+            status: 'Aktif',
             kepemilikan: 'Sewa',
             mulaiSewa: warehouse.mulaiSewa,
             berakhirSewa: warehouse.berakhirSewa,

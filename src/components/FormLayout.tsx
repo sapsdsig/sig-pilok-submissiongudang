@@ -34,7 +34,7 @@ export function BrandHeader({
           />
         </div>
         <div className="brand-title-block">
-          <p className="brand-eyebrow">PILOK · Form Operasional</p>
+          <p className="brand-eyebrow">Form Operasional</p>
           <h1>{title}</h1>
           <p className="brand-subtitle">{subtitle}</p>
         </div>

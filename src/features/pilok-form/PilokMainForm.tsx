@@ -58,19 +58,22 @@ export function PilokMainForm({
       adaPerubahan: 'ya',
       warehouses: masterWarehouses.map((master) => {
         const existing = existingByCode.get(master.kodeGudang)
+        const isInactive = existing?.status === 'Tidak Aktif'
         return {
           kodeGudang: master.kodeGudang,
           namaGudang: master.namaGudang,
           kapasitasGudang: master.kapasitasGudang,
           status: existing?.status ?? '',
-          kepemilikan: existing?.kepemilikan ?? '',
-          mulaiSewa: existing?.mulaiSewa,
-          berakhirSewa: existing?.berakhirSewa,
-          existingShm: existing?.shm,
-          existingBuktiSewa: existing?.buktiSewa,
+          kepemilikan: isInactive ? '' : (existing?.kepemilikan ?? ''),
+          mulaiSewa: isInactive ? undefined : existing?.mulaiSewa,
+          berakhirSewa: isInactive ? undefined : existing?.berakhirSewa,
+          existingShm: isInactive ? undefined : existing?.shm,
+          existingBuktiSewa: isInactive ? undefined : existing?.buktiSewa,
         }
       }),
     },
+    reValidateMode: 'onChange',
+    shouldFocusError: false,
   })
   const {
     register,
@@ -79,7 +82,7 @@ export function PilokMainForm({
     clearErrors,
     setError,
     setValue,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isValid },
   } = form
   const { fields } = useFieldArray({
     control,
@@ -88,16 +91,19 @@ export function PilokMainForm({
   const [processingState, setProcessingState] = useState<
     'idle' | 'uploading' | 'saving'
   >('idle')
+  const [showValidationSummary, setShowValidationSummary] = useState(false)
 
   const selectChangeAnswer = (answer: 'ya' | 'tidak') => {
     if (answer === 'tidak') clearErrors('warehouses')
   }
 
   const submitForm = async (values: PilokFormValues) => {
+    setShowValidationSummary(false)
     try {
       const hasNewFiles =
         values.adaPerubahan === 'ya' &&
         values.warehouses.some((warehouse) =>
+          warehouse.status === 'Aktif' &&
           Boolean(warehouse.shm || warehouse.buktiSewa),
         )
       setProcessingState(hasNewFiles ? 'uploading' : 'saving')
@@ -123,14 +129,38 @@ export function PilokMainForm({
     }
   }
 
+  const handleInvalidSubmit = () => {
+    setShowValidationSummary(true)
+    window.requestAnimationFrame(() => {
+      document.getElementById('form-validation-summary')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+      const firstInvalidField = document
+        .getElementById('pilok-main-form')
+        ?.querySelector<HTMLElement>('[aria-invalid="true"]:not(.sr-only)')
+      firstInvalidField?.focus({ preventScroll: true })
+    })
+  }
+
   const adaPerubahan = useWatch({ control, name: 'adaPerubahan' })
 
   return (
     <form
-      onSubmit={handleSubmit(submitForm)}
+      id="pilok-main-form"
+      onSubmit={handleSubmit(submitForm, handleInvalidSubmit)}
       noValidate
       className="w-full min-w-0 max-w-full space-y-6"
     >
+      {showValidationSummary && !isValid && (
+        <div id="form-validation-summary">
+          <StatusBanner variant="error" title="Data belum lengkap">
+            Masih ada data wajib yang belum lengkap. Silakan periksa kembali
+            field yang ditandai.
+          </StatusBanner>
+        </div>
+      )}
+
       <SectionCard>
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <SectionHeader
@@ -201,7 +231,7 @@ export function PilokMainForm({
           </div>
           {!existingSubmission && (
             <p className="mt-2 text-sm text-slate-500">
-              Pilihan &ldquo;Tidak&rdquo; tersedia setelah PILOK memiliki data
+              Pilihan &ldquo;Tidak&rdquo; tersedia setelah kode PILOK memiliki data
               submission sebelumnya.
             </p>
           )}
@@ -215,7 +245,7 @@ export function PilokMainForm({
             <SectionHeader
               step={2}
               title="Data Gudang"
-              description="Lengkapi data survei untuk seluruh gudang pada master PILOK ini."
+              description="Lengkapi data survei untuk seluruh gudang. Daftar gudang yang ditampilkan secara otomatis mengacu pada data gudang yang terdaftar di MDXL."
             />
             <FieldError
               message={

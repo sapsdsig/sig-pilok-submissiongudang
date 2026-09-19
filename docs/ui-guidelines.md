@@ -38,6 +38,9 @@ sebelum membuat pola baru.
   supervisor-panel.
 - Field memakai tinggi 44 px, radius 8 px, label di atas, helper/error tepat di
   bawah, dan focus ring yang terlihat.
+- Field kondisional yang tidak lagi berlaku karena pilihan pengendali harus
+  disembunyikan, bukan tetap ditampilkan seolah-olah opsional. Nilai lama dari
+  field tersebut harus dibersihkan sebelum payload dinormalisasi.
 - Gunakan SearchableSelect untuk master data. Nilai terpilih harus jelas,
   label panjang harus truncate, dan nilai lengkap tetap tersedia melalui title
   atau accessible label.
@@ -54,6 +57,11 @@ sebelum membuat pola baru.
 - Tempatkan aksi final di ActionBar. Pada mobile, aksi utama memenuhi lebar.
 - Gunakan StatusBanner dengan variant info, success, warning, atau error;
   jangan membuat box status ad-hoc.
+- Setelah submit tidak valid, tampilkan ringkasan error dekat awal form dengan
+  StatusBanner error, pertahankan error inline di masing-masing field, lalu
+  arahkan scroll/fokus ke field tidak valid pertama jika memungkinkan.
+- Jangan tampilkan ringkasan error validasi sebelum pengguna mencoba submit;
+  sembunyikan kembali setelah form valid atau berhasil dikirim.
 
 ## Spacing dan typography
 

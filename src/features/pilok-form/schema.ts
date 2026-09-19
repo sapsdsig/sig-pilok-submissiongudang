@@ -128,6 +128,8 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
         })
       }
 
+      if (warehouse.status !== 'Aktif') return
+
       if (warehouse.kepemilikan === '') {
         context.addIssue({
           code: 'custom',

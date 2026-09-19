@@ -111,7 +111,7 @@ export function PilokAccess({ onResolved }: PilokAccessProps) {
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          placeholder="Contoh: 0001"
+          placeholder="Contoh: 10001"
           aria-invalid={Boolean(errors.kodePilok)}
           aria-describedby={errors.kodePilok ? 'kodePilok-error' : undefined}
           className={`text-input ${errors.kodePilok ? 'input-error' : ''}`}

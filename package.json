@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "typecheck": "tsc -b --pretty false",
+    "verify:qa": "tsx --tsconfig tsconfig.qa.json scripts/verify-qa.ts",
     "verify:google": "tsx scripts/verify-google.ts"
   },
   "dependencies": {

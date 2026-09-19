@@ -24,7 +24,7 @@ const documentSchema = z
 const ownedWarehouseSchema = z
   .object({
     kodeGudang: z.string().trim().min(1),
-    status: z.enum(['Aktif', 'Tidak Aktif']),
+    status: z.literal('Aktif'),
     kepemilikan: z.literal('Milik Sendiri'),
     shm: documentSchema,
   })
@@ -33,7 +33,7 @@ const ownedWarehouseSchema = z
 const rentedWarehouseSchema = z
   .object({
     kodeGudang: z.string().trim().min(1),
-    status: z.enum(['Aktif', 'Tidak Aktif']),
+    status: z.literal('Aktif'),
     kepemilikan: z.literal('Sewa'),
     mulaiSewa: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     berakhirSewa: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -41,7 +41,20 @@ const rentedWarehouseSchema = z
   })
   .strict()
 
-const warehouseSchema = z.discriminatedUnion('kepemilikan', [
+const inactiveWarehouseSchema = z
+  .object({
+    kodeGudang: z.string().trim().min(1),
+    status: z.literal('Tidak Aktif'),
+    kepemilikan: z.union([z.literal(''), z.null()]).optional(),
+    mulaiSewa: z.union([z.literal(''), z.null()]).optional(),
+    berakhirSewa: z.union([z.literal(''), z.null()]).optional(),
+    shm: z.null().optional(),
+    buktiSewa: z.null().optional(),
+  })
+  .strict()
+
+export const submissionWarehouseSchema = z.union([
+  inactiveWarehouseSchema,
   ownedWarehouseSchema,
   rentedWarehouseSchema,
 ])
@@ -102,7 +115,7 @@ export async function validateAndNormalizeSubmission(
     }
   }
 
-  const parsedWarehouses = z.array(warehouseSchema).min(1).safeParse(
+  const parsedWarehouses = z.array(submissionWarehouseSchema).min(1).safeParse(
     envelope.data.warehouses,
   )
   if (!parsedWarehouses.success) {
@@ -159,6 +172,14 @@ export async function validateAndNormalizeSubmission(
             'WAREHOUSE_NOT_FOUND',
             'Kode Gudang tidak ditemukan.',
           )
+        }
+
+        if (warehouse.status === 'Tidak Aktif') {
+          return {
+            kodeGudang: master.kodeGudang,
+            status: 'Tidak Aktif',
+            kepemilikan: '',
+          }
         }
 
         if (warehouse.kepemilikan === 'Milik Sendiri') {

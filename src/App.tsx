@@ -41,8 +41,8 @@ function App() {
 
   return (
     <FormShell
-      title="PILOK - Informasi Gudang"
-      subtitle="Form pendataan gudang distributor berdasarkan master PILOK."
+      title="PILOK - Gudang Distributor"
+      subtitle="Pendataan Status Kepemilikan Gudang Distributor."
     >
       <div className={pilok ? '' : 'mx-auto max-w-xl'}>
         {submittedPayload ? (

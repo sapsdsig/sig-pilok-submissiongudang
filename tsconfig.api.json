@@ -13,5 +13,6 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["api/**/*.ts", "scripts/**/*.ts"]
+  "include": ["api/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["scripts/verify-qa.ts"]
 }

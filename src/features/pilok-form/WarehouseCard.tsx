@@ -20,8 +20,14 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
     setValue,
     getValues,
     unregister,
+    clearErrors,
+    trigger,
     formState: { errors },
   } = form
+  const status = useWatch({
+    control,
+    name: `warehouses.${index}.status`,
+  })
   const ownership = useWatch({
     control,
     name: `warehouses.${index}.kepemilikan`,
@@ -50,6 +56,32 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
   const ownershipRegistration = register(
     `warehouses.${index}.kepemilikan`,
   )
+  const statusRegistration = register(`warehouses.${index}.status`)
+
+  const clearOwnershipValues = () => {
+    setValue(`warehouses.${index}.kepemilikan`, '')
+    setValue(`warehouses.${index}.mulaiSewa`, undefined)
+    setValue(`warehouses.${index}.berakhirSewa`, undefined)
+    setValue(`warehouses.${index}.shm`, undefined)
+    setValue(`warehouses.${index}.buktiSewa`, undefined)
+    setValue(`warehouses.${index}.existingShm`, undefined)
+    setValue(`warehouses.${index}.existingBuktiSewa`, undefined)
+    clearErrors([
+      `warehouses.${index}.kepemilikan`,
+      `warehouses.${index}.mulaiSewa`,
+      `warehouses.${index}.berakhirSewa`,
+      `warehouses.${index}.shm`,
+      `warehouses.${index}.buktiSewa`,
+    ])
+  }
+
+  const handleStatusChange = async (event: ChangeEvent<HTMLSelectElement>) => {
+    await statusRegistration.onChange(event)
+    if (event.target.value === 'Tidak Aktif') {
+      clearOwnershipValues()
+      await trigger(`warehouses.${index}`)
+    }
+  }
 
   const handleOwnershipChange = (event: ChangeEvent<HTMLSelectElement>) => {
     void ownershipRegistration.onChange(event)
@@ -110,7 +142,8 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
             id={`warehouse-${index}-status`}
             aria-invalid={Boolean(warehouseErrors?.status)}
             className={`${inputClass} ${warehouseErrors?.status ? 'border-red-500' : ''}`}
-            {...register(`warehouses.${index}.status`)}
+            {...statusRegistration}
+            onChange={handleStatusChange}
           >
             <option value="">Pilih status</option>
             <option value="Aktif">Aktif</option>
@@ -119,26 +152,32 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
           <FieldError message={warehouseErrors?.status?.message} />
         </div>
 
-        <div className="min-w-0 max-w-full">
-          <label htmlFor={`warehouse-${index}-ownership`} className={labelClass}>
-            Kepemilikan Gudang <span className="text-red-600">*</span>
-          </label>
-          <select
-            id={`warehouse-${index}-ownership`}
-            aria-invalid={Boolean(warehouseErrors?.kepemilikan)}
-            className={`${inputClass} ${warehouseErrors?.kepemilikan ? 'border-red-500' : ''}`}
-            {...ownershipRegistration}
-            onChange={handleOwnershipChange}
-          >
-            <option value="">Pilih kepemilikan</option>
-            <option value="Milik Sendiri">Milik Sendiri</option>
-            <option value="Sewa">Sewa</option>
-          </select>
-          <FieldError message={warehouseErrors?.kepemilikan?.message} />
-        </div>
+        {status !== 'Tidak Aktif' && (
+          <div className="min-w-0 max-w-full">
+            <label htmlFor={`warehouse-${index}-ownership`} className={labelClass}>
+              Kepemilikan Gudang <span className="text-red-600">*</span>
+            </label>
+            <select
+              id={`warehouse-${index}-ownership`}
+              aria-invalid={Boolean(warehouseErrors?.kepemilikan)}
+              className={`${inputClass} ${warehouseErrors?.kepemilikan ? 'border-red-500' : ''}`}
+              {...ownershipRegistration}
+              onChange={handleOwnershipChange}
+            >
+              <option value="">Pilih kepemilikan</option>
+              <option value="Milik Sendiri">Milik Sendiri</option>
+              <option value="Sewa">Sewa</option>
+            </select>
+            <FieldError message={warehouseErrors?.kepemilikan?.message} />
+          </div>
+        )}
 
-        {ownership === 'Milik Sendiri' && (
-          <div className="min-w-0 max-w-full sm:col-span-2">
+        {status === 'Aktif' && ownership === 'Milik Sendiri' && (
+          <div
+            className="min-w-0 max-w-full rounded-lg focus:outline-none focus:ring-3 focus:ring-red-100 sm:col-span-2"
+            tabIndex={-1}
+            aria-invalid={Boolean(warehouseErrors?.shm)}
+          >
             <label htmlFor={`warehouse-${index}-shm`} className={labelClass}>
               {existingShm ? 'Ganti PDF SHM' : 'Upload SHM'}{' '}
               <span className="text-red-600">*</span>
@@ -194,7 +233,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
           </div>
         )}
 
-        {ownership === 'Sewa' && (
+        {status === 'Aktif' && ownership === 'Sewa' && (
           <>
             <div className="min-w-0 max-w-full">
               <label htmlFor={`warehouse-${index}-start`} className={labelClass}>
@@ -225,7 +264,11 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
               <FieldError message={warehouseErrors?.berakhirSewa?.message} />
             </div>
 
-            <div className="min-w-0 max-w-full sm:col-span-2">
+            <div
+              className="min-w-0 max-w-full rounded-lg focus:outline-none focus:ring-3 focus:ring-red-100 sm:col-span-2"
+              tabIndex={-1}
+              aria-invalid={Boolean(warehouseErrors?.buktiSewa)}
+            >
               <label
                 htmlFor={`warehouse-${index}-rental-proof`}
                 className={labelClass}

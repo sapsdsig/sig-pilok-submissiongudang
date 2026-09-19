@@ -171,6 +171,23 @@ export async function getExistingSubmission(
           'Status gudang pada submission tersimpan tidak valid.',
         )
       }
+
+      if (status === 'Tidak Aktif') {
+        return {
+          kodeGudang: row.record.kode_gudang ?? '',
+          namaGudang: row.record.nama_gudang ?? '',
+          kapasitasGudang: row.record.kapasitas_gudang
+            ? readStoredCapacity(
+                row.record.kapasitas_gudang,
+                row.record.kode_gudang ?? '',
+              )
+            : undefined,
+          status,
+          kepemilikan: '',
+          updatedAt: row.record.updated_at ?? '',
+        }
+      }
+
       const kepemilikan = row.record.kepemilikan
       if (
         kepemilikan !== '' &&
@@ -246,6 +263,8 @@ function warehouseRecord(
     bukti_sewa_url: '',
     updated_at: updatedAt,
   }
+  if (warehouse.status === 'Tidak Aktif') return base
+
   if (warehouse.kepemilikan === 'Milik Sendiri') {
     return {
       ...base,
