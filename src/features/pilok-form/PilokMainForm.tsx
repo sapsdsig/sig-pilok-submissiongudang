@@ -72,7 +72,7 @@ export function PilokMainForm({
         }
       }),
     },
-    mode: 'onSubmit',
+    mode: 'onChange',
     reValidateMode: 'onChange',
     shouldFocusError: false,
   })

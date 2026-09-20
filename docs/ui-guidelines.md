@@ -62,14 +62,15 @@ sebelum membuat pola baru.
 
 - Jangan tampilkan error validasi saat form pertama kali dimuat. Indikator
   field wajib tetap boleh ditampilkan.
-- Setelah submit tidak valid, tampilkan feedback tepat di samping atau di bawah
-  setiap field yang bermasalah dengan pesan yang menjelaskan secara spesifik
-  data yang kurang atau tidak valid.
-- Setelah percobaan submit pertama, validasi ulang field pada saat nilainya
-  berubah agar error langsung hilang ketika nilai sudah valid, sementara error
-  field lain tetap terlihat.
-- Arahkan smooth scroll dan fokus ke field tidak valid pertama sesuai urutan
-  visual/DOM.
+- Jalankan validasi secara live saat nilai field berubah. Tampilkan feedback
+  tepat di samping atau di bawah setiap field yang bermasalah dengan pesan yang
+  menjelaskan secara spesifik data yang kurang atau tidak valid.
+- Perubahan field pengendali harus langsung memvalidasi ulang field
+  dependennya. Error field kondisional yang tidak lagi relevan harus segera
+  dibersihkan.
+- Submit tetap menjalankan validasi penuh sebagai pengaman terakhir serta
+  mengarahkan smooth scroll dan fokus ke field tidak valid pertama sesuai
+  urutan visual/DOM.
 - Jangan gunakan ringkasan validasi generik pada level halaman untuk field
   wajib biasa. Banner level halaman tetap digunakan untuk kegagalan sistem,
   API, atau upload.

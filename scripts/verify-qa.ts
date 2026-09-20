@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
+import { zodResolver } from '@hookform/resolvers/zod'
 import React, { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { createFormControl, type FieldPath } from 'react-hook-form'
 import { submissionWarehouseSchema } from '../api/_lib/submissionValidation.js'
 import { buildSubmissionPayload } from '../src/features/pilok-form/buildPayload.js'
 import type {
@@ -119,6 +121,119 @@ assert.deepEqual(
     }),
   ),
   ['Ukuran file maksimal 10 MB.'],
+)
+
+const liveForm = createFormControl<PilokFormValues>({
+  resolver: zodResolver(schema),
+  mode: 'onChange',
+  reValidateMode: 'onChange',
+  shouldUnregister: false,
+  defaultValues: valuesWith({
+    ...baseWarehouse,
+    status: '',
+    kepemilikan: '',
+  }),
+})
+const livePaths = {
+  warehouse: 'warehouses.0',
+  status: 'warehouses.0.status',
+  ownership: 'warehouses.0.kepemilikan',
+  startDate: 'warehouses.0.mulaiSewa',
+  endDate: 'warehouses.0.berakhirSewa',
+  shm: 'warehouses.0.shm',
+  rentalProof: 'warehouses.0.buktiSewa',
+} as const satisfies Record<string, FieldPath<PilokFormValues>>
+
+liveForm.register(livePaths.status)
+liveForm.register(livePaths.ownership)
+
+const liveError = (path: FieldPath<PilokFormValues>) =>
+  liveForm.getFieldState(path).error?.message
+
+assert.equal(liveError(livePaths.status), undefined)
+assert.equal(liveError(livePaths.ownership), undefined)
+
+liveForm.setValue(livePaths.status, 'Aktif', { shouldValidate: true })
+await liveForm.trigger(livePaths.warehouse)
+assert.equal(
+  liveError(livePaths.ownership),
+  'Kepemilikan Gudang wajib dipilih.',
+)
+
+liveForm.setValue(livePaths.ownership, 'Sewa', { shouldValidate: true })
+await liveForm.trigger(livePaths.warehouse)
+liveForm.register(livePaths.startDate)
+liveForm.register(livePaths.endDate)
+liveForm.register(livePaths.rentalProof)
+assert.equal(
+  liveError(livePaths.startDate),
+  'Tanggal mulai sewa wajib diisi.',
+)
+assert.equal(
+  liveError(livePaths.endDate),
+  'Tanggal berakhir sewa wajib diisi.',
+)
+assert.equal(
+  liveError(livePaths.rentalProof),
+  'Bukti sewa wajib diunggah.',
+)
+
+liveForm.setValue(livePaths.startDate, '2026-12-31', {
+  shouldValidate: true,
+})
+await liveForm.trigger(livePaths.endDate)
+assert.equal(liveError(livePaths.startDate), undefined)
+assert.equal(
+  liveError(livePaths.endDate),
+  'Tanggal berakhir sewa wajib diisi.',
+)
+
+liveForm.setValue(livePaths.endDate, '2026-01-01', { shouldValidate: true })
+await liveForm.trigger(livePaths.endDate)
+assert.equal(
+  liveError(livePaths.endDate),
+  'Tanggal berakhir sewa tidak boleh lebih awal dari tanggal mulai sewa.',
+)
+
+liveForm.setValue(livePaths.ownership, 'Milik Sendiri', {
+  shouldValidate: true,
+})
+liveForm.unregister([
+  livePaths.startDate,
+  livePaths.endDate,
+  livePaths.rentalProof,
+])
+liveForm.clearErrors([
+  livePaths.startDate,
+  livePaths.endDate,
+  livePaths.rentalProof,
+])
+await liveForm.trigger(livePaths.warehouse)
+liveForm.register(livePaths.shm)
+assert.equal(liveError(livePaths.startDate), undefined)
+assert.equal(liveError(livePaths.endDate), undefined)
+assert.equal(liveError(livePaths.rentalProof), undefined)
+assert.equal(liveError(livePaths.shm), 'Dokumen SHM wajib diunggah.')
+
+liveForm.setValue(livePaths.status, 'Tidak Aktif', { shouldValidate: true })
+liveForm.setValue(livePaths.ownership, '')
+liveForm.setValue(livePaths.shm, undefined)
+liveForm.clearErrors([
+  livePaths.ownership,
+  livePaths.startDate,
+  livePaths.endDate,
+  livePaths.shm,
+  livePaths.rentalProof,
+])
+await liveForm.trigger(livePaths.warehouse)
+assert.equal(liveError(livePaths.ownership), undefined)
+assert.equal(liveError(livePaths.shm), undefined)
+
+liveForm.setValue(livePaths.status, 'Aktif', { shouldValidate: true })
+await liveForm.trigger(livePaths.warehouse)
+assert.equal(
+  liveError(livePaths.ownership),
+  'Kepemilikan Gudang wajib dipilih.',
 )
 
 const inactiveWarehouse: WarehouseFormValues = {

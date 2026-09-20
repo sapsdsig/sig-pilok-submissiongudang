@@ -79,12 +79,14 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
     await statusRegistration.onChange(event)
     if (event.target.value === 'Tidak Aktif') {
       clearOwnershipValues()
-      await trigger(`warehouses.${index}`)
     }
+    await trigger(`warehouses.${index}`)
   }
 
-  const handleOwnershipChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    void ownershipRegistration.onChange(event)
+  const handleOwnershipChange = async (
+    event: ChangeEvent<HTMLSelectElement>,
+  ) => {
+    await ownershipRegistration.onChange(event)
     const selected = event.target.value
 
     if (selected === 'Milik Sendiri') {
@@ -92,9 +94,15 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
       unregister(`warehouses.${index}.berakhirSewa`)
       unregister(`warehouses.${index}.buktiSewa`)
       setValue(`warehouses.${index}.existingBuktiSewa`, undefined)
+      clearErrors([
+        `warehouses.${index}.mulaiSewa`,
+        `warehouses.${index}.berakhirSewa`,
+        `warehouses.${index}.buktiSewa`,
+      ])
     } else if (selected === 'Sewa') {
       unregister(`warehouses.${index}.shm`)
       setValue(`warehouses.${index}.existingShm`, undefined)
+      clearErrors(`warehouses.${index}.shm`)
     } else {
       unregister(`warehouses.${index}.mulaiSewa`)
       unregister(`warehouses.${index}.berakhirSewa`)
@@ -102,7 +110,15 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
       unregister(`warehouses.${index}.shm`)
       setValue(`warehouses.${index}.existingShm`, undefined)
       setValue(`warehouses.${index}.existingBuktiSewa`, undefined)
+      clearErrors([
+        `warehouses.${index}.mulaiSewa`,
+        `warehouses.${index}.berakhirSewa`,
+        `warehouses.${index}.shm`,
+        `warehouses.${index}.buktiSewa`,
+      ])
     }
+
+    await trigger(`warehouses.${index}`)
   }
 
   const master = getValues(`warehouses.${index}`)
@@ -244,7 +260,9 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
                 type="date"
                 aria-invalid={Boolean(warehouseErrors?.mulaiSewa)}
                 className={`${inputClass} ${warehouseErrors?.mulaiSewa ? 'border-red-500' : ''}`}
-                {...register(`warehouses.${index}.mulaiSewa`)}
+                {...register(`warehouses.${index}.mulaiSewa`, {
+                  deps: `warehouses.${index}.berakhirSewa`,
+                })}
               />
               <FieldError message={warehouseErrors?.mulaiSewa?.message} />
             </div>
