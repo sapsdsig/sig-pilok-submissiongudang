@@ -3,7 +3,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import React, { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createFormControl, type FieldPath } from 'react-hook-form'
+import {
+  getWibTimestamp,
+  isSupportedStoredTimestamp,
+} from '../api/_lib/dateTime.js'
 import { submissionWarehouseSchema } from '../api/_lib/submissionValidation.js'
+import { resolveSubmissionTimestamps } from '../api/_lib/submissions.js'
 import { buildSubmissionPayload } from '../src/features/pilok-form/buildPayload.js'
 import type {
   PilokFormValues,
@@ -12,6 +17,12 @@ import type {
 import { createPilokFormSchema } from '../src/features/pilok-form/schema.js'
 import { uploadService } from '../src/services/uploadService.js'
 import type { ExistingSubmission } from '../src/types/domain.js'
+import {
+  compareIndonesianDates,
+  formatIndonesianDate,
+  normalizeStoredRentalDate,
+  parseIndonesianDate,
+} from '../src/utils/date.js'
 
 Object.assign(globalThis, { React })
 const { PilokMainForm } = await import(
@@ -19,6 +30,52 @@ const { PilokMainForm } = await import(
 )
 
 const schema = createPilokFormSchema(false)
+
+for (const value of ['01:05:2026', '31:12:2026', '29:02:2028']) {
+  assert.notEqual(parseIndonesianDate(value), null, `${value} harus valid.`)
+}
+for (const value of [
+  '29:02:2027',
+  '2026-05-01',
+  '01/05/2026',
+  '01-05-2026',
+  '32:01:2026',
+]) {
+  assert.equal(parseIndonesianDate(value), null, `${value} harus ditolak.`)
+}
+assert.equal(
+  formatIndonesianDate({ day: 18, month: 9, year: 2026 }),
+  '18:09:2026',
+)
+assert.equal(compareIndonesianDates('18:09:2027', '18:09:2026'), 1)
+assert.equal(compareIndonesianDates('18:09:2026', '18:09:2026'), 0)
+assert.equal(compareIndonesianDates('17:09:2026', '18:09:2026'), -1)
+assert.equal(normalizeStoredRentalDate('2026-09-18'), '18:09:2026')
+assert.equal(normalizeStoredRentalDate('18:09:2026'), '18:09:2026')
+
+const fixedUtc = new Date('2026-09-18T07:04:19.924Z')
+assert.equal(getWibTimestamp(fixedUtc), '2026-09-18 14:04:19')
+assert.equal(isSupportedStoredTimestamp('2026-09-18 14:04:19'), true)
+assert.equal(
+  isSupportedStoredTimestamp('2026-09-18T07:04:19.924Z'),
+  true,
+)
+assert.equal(isSupportedStoredTimestamp('2026-09-18 25:04:19'), false)
+assert.deepEqual(resolveSubmissionTimestamps(null, fixedUtc), {
+  createdAt: '2026-09-18 14:04:19',
+  updatedAt: '2026-09-18 14:04:19',
+})
+assert.deepEqual(
+  resolveSubmissionTimestamps(
+    '2026-09-18T07:04:19.924Z',
+    new Date('2026-09-19T01:02:03.000Z'),
+  ),
+  {
+    createdAt: '2026-09-18T07:04:19.924Z',
+    updatedAt: '2026-09-19 08:02:03',
+  },
+)
+
 const baseWarehouse: WarehouseFormValues = {
   kodeGudang: 'G001',
   namaGudang: 'Gudang QA',
@@ -91,8 +148,8 @@ assert.deepEqual(
     valuesWith({
       ...baseWarehouse,
       kepemilikan: 'Sewa',
-      mulaiSewa: '2026-12-31',
-      berakhirSewa: '2026-01-01',
+      mulaiSewa: '31:12:2026',
+      berakhirSewa: '01:01:2026',
       existingBuktiSewa: existingDocument,
     }),
   ),
@@ -178,7 +235,7 @@ assert.equal(
   'Bukti sewa wajib diunggah.',
 )
 
-liveForm.setValue(livePaths.startDate, '2026-12-31', {
+liveForm.setValue(livePaths.startDate, '31:12:2026', {
   shouldValidate: true,
 })
 await liveForm.trigger(livePaths.endDate)
@@ -188,7 +245,7 @@ assert.equal(
   'Tanggal berakhir sewa wajib diisi.',
 )
 
-liveForm.setValue(livePaths.endDate, '2026-01-01', { shouldValidate: true })
+liveForm.setValue(livePaths.endDate, '01:01:2026', { shouldValidate: true })
 await liveForm.trigger(livePaths.endDate)
 assert.equal(
   liveError(livePaths.endDate),
@@ -293,8 +350,65 @@ assert.equal(
   false,
   'Server tetap menolak gudang sewa yang tidak lengkap.',
 )
+assert.equal(
+  submissionWarehouseSchema.safeParse({
+    kodeGudang: 'G001',
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    mulaiSewa: '01:05:2026',
+    berakhirSewa: '31:12:2026',
+    buktiSewa: existingDocument,
+  }).success,
+  true,
+  'Server menerima tanggal sewa DD:MM:YYYY.',
+)
+assert.equal(
+  submissionWarehouseSchema.safeParse({
+    kodeGudang: 'G001',
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    mulaiSewa: '2026-05-01',
+    berakhirSewa: '2026-12-31',
+    buktiSewa: existingDocument,
+  }).success,
+  false,
+  'Server menolak tanggal sewa format lama.',
+)
+assert.equal(
+  submissionWarehouseSchema.safeParse({
+    kodeGudang: 'G001',
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    mulaiSewa: '31:12:2026',
+    berakhirSewa: '01:01:2026',
+    buktiSewa: existingDocument,
+  }).success,
+  false,
+  'Server menolak tanggal berakhir sebelum tanggal mulai.',
+)
 
 const originalUploadDocument = uploadService.uploadDocument.bind(uploadService)
+const persistedRentalPayload = await buildSubmissionPayload(
+  valuesWith({
+    ...baseWarehouse,
+    kepemilikan: 'Sewa',
+    mulaiSewa: '01:05:2026',
+    berakhirSewa: '31:12:2026',
+    existingBuktiSewa: existingDocument,
+  }),
+  () => undefined,
+)
+assert.deepEqual(persistedRentalPayload.warehouses, [
+  {
+    kodeGudang: 'G001',
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    mulaiSewa: '01:05:2026',
+    berakhirSewa: '31:12:2026',
+    buktiSewa: existingDocument,
+  },
+])
+
 let uploadCount = 0
 uploadService.uploadDocument = async () => {
   uploadCount += 1
@@ -309,8 +423,8 @@ try {
   const staleRental = {
     ...inactiveWarehouse,
     kepemilikan: 'Sewa' as const,
-    mulaiSewa: '2026-01-01',
-    berakhirSewa: '2026-12-31',
+    mulaiSewa: '01:01:2026',
+    berakhirSewa: '31:12:2026',
     buktiSewa: new File(['pdf'], 'sewa.pdf', { type: 'application/pdf' }),
   }
   const rentalPayload = await buildSubmissionPayload(

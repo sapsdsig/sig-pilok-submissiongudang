@@ -7,6 +7,11 @@ import type {
   WarehouseMaster,
   WarehouseSubmission,
 } from '../../src/types/domain.js'
+import { normalizeStoredRentalDate } from '../../src/utils/date.js'
+import {
+  getWibTimestamp,
+  isSupportedStoredTimestamp,
+} from './dateTime.js'
 import { verifyDriveDocument } from './drive.js'
 import { getSubmissionSheetConfig } from './env.js'
 import { ApiError } from './errors.js'
@@ -133,8 +138,8 @@ export async function getExistingSubmission(
   if (
     !createdAt ||
     !updatedAt ||
-    !Number.isFinite(Date.parse(createdAt)) ||
-    !Number.isFinite(Date.parse(updatedAt))
+    !isSupportedStoredTimestamp(createdAt) ||
+    !isSupportedStoredTimestamp(updatedAt)
   ) {
     throw new ApiError(
       500,
@@ -221,8 +226,12 @@ export async function getExistingSubmission(
           : undefined,
         status,
         kepemilikan,
-        mulaiSewa: row.record.mulai_sewa || undefined,
-        berakhirSewa: row.record.berakhir_sewa || undefined,
+        mulaiSewa: row.record.mulai_sewa
+          ? normalizeStoredRentalDate(row.record.mulai_sewa)
+          : undefined,
+        berakhirSewa: row.record.berakhir_sewa
+          ? normalizeStoredRentalDate(row.record.berakhir_sewa)
+          : undefined,
         shm,
         buktiSewa,
         updatedAt: row.record.updated_at ?? '',
@@ -283,6 +292,24 @@ function warehouseRecord(
   }
 }
 
+export function resolveSubmissionTimestamps(
+  storedCreatedAt: string | null,
+  now = new Date(),
+) {
+  const updatedAt = getWibTimestamp(now)
+  if (storedCreatedAt === null) {
+    return { createdAt: updatedAt, updatedAt }
+  }
+  if (!storedCreatedAt || !isSupportedStoredTimestamp(storedCreatedAt)) {
+    throw new ApiError(
+      500,
+      'SUBMISSION_INVALID',
+      'Timestamp pembuatan submission tersimpan tidak valid.',
+    )
+  }
+  return { createdAt: storedCreatedAt, updatedAt }
+}
+
 export async function upsertSubmission(
   pilok: Pilok,
   request: PilokSubmissionRequest,
@@ -319,19 +346,10 @@ export async function upsertSubmission(
     )
   }
 
-  const updatedAt = new Date().toISOString()
-  const storedCreatedAt = existingRows[0]?.record.created_at
-  if (
-    existingRows[0] &&
-    (!storedCreatedAt || !Number.isFinite(Date.parse(storedCreatedAt)))
-  ) {
-    throw new ApiError(
-      500,
-      'SUBMISSION_INVALID',
-      'Timestamp pembuatan submission tersimpan tidak valid.',
-    )
-  }
-  const createdAt = storedCreatedAt || updatedAt
+  const storedCreatedAt = existingRows[0]
+    ? existingRows[0].record.created_at ?? ''
+    : null
+  const { createdAt, updatedAt } = resolveSubmissionTimestamps(storedCreatedAt)
   const warehouses = request.adaPerubahan
     ? request.warehouses.map((warehouse): WarehouseSubmission => {
         const master = warehouseMasters.get(warehouse.kodeGudang)

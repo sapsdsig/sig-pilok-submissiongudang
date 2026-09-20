@@ -60,22 +60,72 @@ sebelum membuat pola baru.
 
 ### Field Validation
 
-- Jangan tampilkan error validasi saat form pertama kali dimuat. Indikator
-  field wajib tetap boleh ditampilkan.
-- Jalankan validasi secara live saat nilai field berubah. Tampilkan feedback
-  tepat di samping atau di bawah setiap field yang bermasalah dengan pesan yang
-  menjelaskan secara spesifik data yang kurang atau tidak valid.
+Gunakan pola yang sama pada seluruh form PILOK agar timing, posisi, dan bahasa
+error tetap konsisten.
+
+#### Timing dan perilaku
+
+- Konfigurasikan React Hook Form dengan `mode: "onChange"` dan
+  `reValidateMode: "onChange"`. Zod tetap menjadi sumber aturan validasi.
+- Jangan tampilkan error saat form pertama kali dimuat. Indikator field wajib
+  tetap boleh ditampilkan.
+- Setelah pengguna mengubah nilai, validasi field secara live. Nilai yang sudah
+  benar harus langsung menghapus error field tersebut tanpa menghapus error
+  lain yang belum diperbaiki.
 - Perubahan field pengendali harus langsung memvalidasi ulang field
-  dependennya. Error field kondisional yang tidak lagi relevan harus segera
-  dibersihkan.
+  dependennya menggunakan mekanisme React Hook Form seperti `trigger`,
+  `clearErrors`, `unregister`, atau `setValue` sesuai kebutuhan.
+- Field kondisional yang disembunyikan atau tidak lagi relevan tidak boleh
+  menyimpan nilai usang maupun menampilkan error.
 - Submit tetap menjalankan validasi penuh sebagai pengaman terakhir serta
   mengarahkan smooth scroll dan fokus ke field tidak valid pertama sesuai
   urutan visual/DOM.
+
+#### Posisi dan aksesibilitas
+
+- Tampilkan pesan melalui komponen `FieldError` tepat di bawah atau di samping
+  field yang bermasalah; jangan membuat variasi error inline baru.
+- Control invalid menggunakan `aria-invalid="true"`, visual state
+  `input-error`, dan `aria-describedby` yang mengarah ke `id` pesan error.
+- Pesan harus tetap terbaca oleh screen reader melalui semantics `role="alert"`
+  yang disediakan `FieldError`.
 - Jangan gunakan ringkasan validasi generik pada level halaman untuk field
-  wajib biasa. Banner level halaman tetap digunakan untuk kegagalan sistem,
-  API, atau upload.
-- Field yang disembunyikan atau tidak lagi relevan karena kondisi tertentu
-  tidak boleh menampilkan error validasi.
+  wajib biasa. `StatusBanner` level halaman hanya untuk status proses atau
+  kegagalan sistem, API, dan upload.
+
+#### Copy pesan
+
+Gunakan bahasa Indonesia yang singkat, spesifik, dan diakhiri tanda titik.
+Sebutkan nama field atau dokumen sebagaimana tampil pada label; jangan memakai
+nama key payload, istilah teknis internal, atau pesan umum seperti
+"Data tidak valid".
+
+| Kondisi | Pola | Contoh |
+| --- | --- | --- |
+| Pilihan wajib kosong | `[Nama field] wajib dipilih.` | `Status Gudang wajib dipilih.` |
+| Input wajib kosong | `[Nama field] wajib diisi.` | `Tanggal mulai sewa wajib diisi.` |
+| Dokumen wajib kosong | `[Nama dokumen] wajib diunggah.` | `Dokumen SHM wajib diunggah.` |
+| Format file salah | Jelaskan format yang diterima | `File harus berformat PDF.` |
+| Ukuran file berlebih | Sebutkan batas ukuran | `Ukuran file maksimal 10 MB.` |
+| Relasi nilai tidak valid | Jelaskan relasi yang harus diperbaiki | `Tanggal berakhir sewa tidak boleh lebih awal dari tanggal mulai sewa.` |
+| Nilai tidak ditemukan | Sebutkan nilai dan tindakan berikutnya | `Kode PILOK tidak ditemukan. Periksa kembali kode yang dimasukkan.` |
+
+Gunakan kapitalisasi nama field secara konsisten dengan label. Untuk kalimat
+deskriptif seperti tanggal mulai/berakhir sewa, gunakan sentence case seperti
+contoh di atas.
+
+### Date and Time
+
+- Tanggal kalender yang diinput pengguna menggunakan format `DD:MM:YYYY`,
+  misalnya `18:09:2026`. Tampilkan format ini melalui placeholder atau helper
+  text pada field terkait.
+- Validasi tanggal harus memisahkan komponen hari, bulan, dan tahun secara
+  eksplisit. Jangan mengandalkan parsing `Date` yang bergantung locale browser
+  atau server.
+- Timestamp sistem pada form operasional PILOK menggunakan WIB dengan timezone
+  eksplisit `Asia/Jakarta` dan format `YYYY-MM-DD HH:mm:ss`.
+- Timestamp dibuat oleh server; jangan memakai jam browser atau timezone lokal
+  runtime secara implisit.
 
 ## Spacing dan typography
 

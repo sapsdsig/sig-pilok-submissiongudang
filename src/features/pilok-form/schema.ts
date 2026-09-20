@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import {
+  compareIndonesianDates,
+  parseIndonesianDate,
+} from '../../utils/date'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -41,18 +45,6 @@ const basePilokFormSchema = z.object({
   adaPerubahan: z.union([z.literal('ya'), z.literal('tidak')]),
   warehouses: z.array(warehouseSchema),
 })
-
-const isValidDateInput = (value: string): boolean => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
-
-  const [year, month, day] = value.split('-').map(Number)
-  const parsed = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 0))
-  return (
-    parsed.getUTCFullYear() === year &&
-    parsed.getUTCMonth() === (month ?? 1) - 1 &&
-    parsed.getUTCDate() === day
-  )
-}
 
 const validatePdf = (
   file: File | undefined,
@@ -158,7 +150,7 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
             path: ['warehouses', index, 'mulaiSewa'],
             message: 'Tanggal mulai sewa wajib diisi.',
           })
-        } else if (!isValidDateInput(startDate)) {
+        } else if (!parseIndonesianDate(startDate)) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'mulaiSewa'],
@@ -172,13 +164,16 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
             path: ['warehouses', index, 'berakhirSewa'],
             message: 'Tanggal berakhir sewa wajib diisi.',
           })
-        } else if (!isValidDateInput(endDate)) {
+        } else if (!parseIndonesianDate(endDate)) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'berakhirSewa'],
             message: 'Tanggal berakhir sewa tidak valid.',
           })
-        } else if (startDate && endDate < startDate) {
+        } else if (
+          parseIndonesianDate(startDate) &&
+          compareIndonesianDates(endDate, startDate) === -1
+        ) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'berakhirSewa'],

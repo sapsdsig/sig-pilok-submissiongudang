@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import {
+  compareIndonesianDates,
+  parseIndonesianDate,
+} from '../../src/utils/date.js'
 import type {
   Pilok,
   PilokSubmissionRequest,
@@ -35,11 +39,25 @@ const rentedWarehouseSchema = z
     kodeGudang: z.string().trim().min(1),
     status: z.literal('Aktif'),
     kepemilikan: z.literal('Sewa'),
-    mulaiSewa: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    berakhirSewa: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    mulaiSewa: z.string().refine((value) => parseIndonesianDate(value)),
+    berakhirSewa: z.string().refine((value) => parseIndonesianDate(value)),
     buktiSewa: documentSchema,
   })
   .strict()
+  .superRefine((warehouse, context) => {
+    if (
+      compareIndonesianDates(
+        warehouse.berakhirSewa,
+        warehouse.mulaiSewa,
+      ) === -1
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['berakhirSewa'],
+        message: 'Rentang tanggal sewa tidak valid.',
+      })
+    }
+  })
 
 const inactiveWarehouseSchema = z
   .object({
@@ -66,16 +84,6 @@ const envelopeSchema = z
     warehouses: z.array(z.unknown()).default([]),
   })
   .strict()
-
-function validDate(value: string) {
-  const [year, month, day] = value.split('-').map(Number)
-  const parsed = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 0))
-  return (
-    parsed.getUTCFullYear() === year &&
-    parsed.getUTCMonth() === (month ?? 1) - 1 &&
-    parsed.getUTCDate() === day
-  )
-}
 
 export interface ValidatedSubmission {
   pilok: Pilok
@@ -192,17 +200,6 @@ export async function validateAndNormalizeSubmission(
           }
         }
 
-        if (
-          !validDate(warehouse.mulaiSewa) ||
-          !validDate(warehouse.berakhirSewa) ||
-          warehouse.berakhirSewa < warehouse.mulaiSewa
-        ) {
-          throw new ApiError(
-            400,
-            'SUBMISSION_INVALID',
-            'Rentang tanggal sewa tidak valid.',
-          )
-        }
         const buktiSewa = await verifyDriveDocument(
           warehouse.buktiSewa.fileId,
           'BUKTI_SEWA',
