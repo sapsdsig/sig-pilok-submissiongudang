@@ -76,7 +76,7 @@ const validatePdf = (
     context.addIssue({
       code: 'custom',
       path,
-      message: 'Dokumen PDF tidak boleh kosong.',
+      message: 'File PDF tidak boleh kosong.',
     })
   }
 
@@ -84,7 +84,7 @@ const validatePdf = (
     context.addIssue({
       code: 'custom',
       path,
-      message: 'Dokumen harus berupa file PDF.',
+      message: 'File harus berformat PDF.',
     })
   }
 
@@ -143,7 +143,7 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
           warehouse.shm,
           Boolean(warehouse.existingShm),
           ['warehouses', index, 'shm'],
-          'SHM',
+          'Dokumen SHM',
           context,
         )
       }
@@ -156,13 +156,13 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'mulaiSewa'],
-            message: 'Mulai Sewa wajib diisi.',
+            message: 'Tanggal mulai sewa wajib diisi.',
           })
         } else if (!isValidDateInput(startDate)) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'mulaiSewa'],
-            message: 'Tanggal Mulai Sewa tidak valid.',
+            message: 'Tanggal mulai sewa tidak valid.',
           })
         }
 
@@ -170,19 +170,20 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'berakhirSewa'],
-            message: 'Berakhir Sewa wajib diisi.',
+            message: 'Tanggal berakhir sewa wajib diisi.',
           })
         } else if (!isValidDateInput(endDate)) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'berakhirSewa'],
-            message: 'Tanggal Berakhir Sewa tidak valid.',
+            message: 'Tanggal berakhir sewa tidak valid.',
           })
         } else if (startDate && endDate < startDate) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'berakhirSewa'],
-            message: 'Berakhir Sewa tidak boleh lebih awal dari Mulai Sewa.',
+            message:
+              'Tanggal berakhir sewa tidak boleh lebih awal dari tanggal mulai sewa.',
           })
         }
 
@@ -190,7 +191,7 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
           warehouse.buktiSewa,
           Boolean(warehouse.existingBuktiSewa),
           ['warehouses', index, 'buktiSewa'],
-          'Bukti Sewa',
+          'Bukti sewa',
           context,
         )
       }

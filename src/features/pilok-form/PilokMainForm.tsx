@@ -72,6 +72,7 @@ export function PilokMainForm({
         }
       }),
     },
+    mode: 'onSubmit',
     reValidateMode: 'onChange',
     shouldFocusError: false,
   })
@@ -82,7 +83,7 @@ export function PilokMainForm({
     clearErrors,
     setError,
     setValue,
-    formState: { errors, isSubmitting, isValid },
+    formState: { errors, isSubmitting },
   } = form
   const { fields } = useFieldArray({
     control,
@@ -91,14 +92,12 @@ export function PilokMainForm({
   const [processingState, setProcessingState] = useState<
     'idle' | 'uploading' | 'saving'
   >('idle')
-  const [showValidationSummary, setShowValidationSummary] = useState(false)
 
   const selectChangeAnswer = (answer: 'ya' | 'tidak') => {
     if (answer === 'tidak') clearErrors('warehouses')
   }
 
   const submitForm = async (values: PilokFormValues) => {
-    setShowValidationSummary(false)
     try {
       const hasNewFiles =
         values.adaPerubahan === 'ya' &&
@@ -130,15 +129,14 @@ export function PilokMainForm({
   }
 
   const handleInvalidSubmit = () => {
-    setShowValidationSummary(true)
     window.requestAnimationFrame(() => {
-      document.getElementById('form-validation-summary')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
       const firstInvalidField = document
         .getElementById('pilok-main-form')
         ?.querySelector<HTMLElement>('[aria-invalid="true"]:not(.sr-only)')
+      firstInvalidField?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
       firstInvalidField?.focus({ preventScroll: true })
     })
   }
@@ -152,15 +150,6 @@ export function PilokMainForm({
       noValidate
       className="w-full min-w-0 max-w-full space-y-6"
     >
-      {showValidationSummary && !isValid && (
-        <div id="form-validation-summary">
-          <StatusBanner variant="error" title="Data belum lengkap">
-            Masih ada data wajib yang belum lengkap. Silakan periksa kembali
-            field yang ditandai.
-          </StatusBanner>
-        </div>
-      )}
-
       <SectionCard>
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <SectionHeader

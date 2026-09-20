@@ -33,28 +33,92 @@ const valuesWith = (warehouse: WarehouseFormValues): PilokFormValues => ({
   warehouses: [warehouse],
 })
 
-assert.equal(
-  schema.safeParse(valuesWith({ ...baseWarehouse, status: '' })).success,
-  false,
-  'Status gudang wajib dipilih.',
+const validationMessages = (values: PilokFormValues) => {
+  const result = schema.safeParse(values)
+  assert.equal(result.success, false, 'Form seharusnya tidak valid.')
+  if (result.success) return []
+  return result.error.issues.map((issue) => issue.message)
+}
+
+assert.deepEqual(
+  validationMessages(valuesWith({ ...baseWarehouse, status: '' })),
+  ['Status Gudang wajib dipilih.'],
 )
-assert.equal(
-  schema.safeParse(valuesWith(baseWarehouse)).success,
-  false,
-  'Gudang Aktif wajib memiliki kepemilikan.',
-)
-assert.equal(
-  schema.safeParse(
+assert.deepEqual(validationMessages(valuesWith(baseWarehouse)), [
+  'Kepemilikan Gudang wajib dipilih.',
+])
+assert.deepEqual(
+  validationMessages(
     valuesWith({ ...baseWarehouse, kepemilikan: 'Milik Sendiri' }),
-  ).success,
-  false,
-  'Gudang milik sendiri wajib memiliki SHM.',
+  ),
+  ['Dokumen SHM wajib diunggah.'],
 )
-assert.equal(
-  schema.safeParse(valuesWith({ ...baseWarehouse, kepemilikan: 'Sewa' }))
-    .success,
-  false,
-  'Gudang sewa wajib memiliki tanggal dan bukti sewa.',
+assert.deepEqual(
+  validationMessages(
+    valuesWith({ ...baseWarehouse, kepemilikan: 'Sewa' }),
+  ),
+  [
+    'Tanggal mulai sewa wajib diisi.',
+    'Tanggal berakhir sewa wajib diisi.',
+    'Bukti sewa wajib diunggah.',
+  ],
+)
+assert.deepEqual(
+  validationMessages({
+    ...valuesWith({ ...baseWarehouse, status: '' }),
+    warehouses: [
+      { ...baseWarehouse, status: '' },
+      {
+        ...baseWarehouse,
+        kodeGudang: 'G002',
+        namaGudang: 'Gudang QA 2',
+        status: '',
+      },
+    ],
+  }),
+  ['Status Gudang wajib dipilih.', 'Status Gudang wajib dipilih.'],
+)
+
+const existingDocument = {
+  fileId: 'existing-file',
+  fileName: 'existing.pdf',
+  url: 'https://example.invalid/existing-file',
+}
+assert.deepEqual(
+  validationMessages(
+    valuesWith({
+      ...baseWarehouse,
+      kepemilikan: 'Sewa',
+      mulaiSewa: '2026-12-31',
+      berakhirSewa: '2026-01-01',
+      existingBuktiSewa: existingDocument,
+    }),
+  ),
+  [
+    'Tanggal berakhir sewa tidak boleh lebih awal dari tanggal mulai sewa.',
+  ],
+)
+assert.deepEqual(
+  validationMessages(
+    valuesWith({
+      ...baseWarehouse,
+      kepemilikan: 'Milik Sendiri',
+      shm: new File(['not-pdf'], 'shm.txt', { type: 'text/plain' }),
+    }),
+  ),
+  ['File harus berformat PDF.'],
+)
+assert.deepEqual(
+  validationMessages(
+    valuesWith({
+      ...baseWarehouse,
+      kepemilikan: 'Milik Sendiri',
+      shm: new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'shm.pdf', {
+        type: 'application/pdf',
+      }),
+    }),
+  ),
+  ['Ukuran file maksimal 10 MB.'],
 )
 
 const inactiveWarehouse: WarehouseFormValues = {
@@ -198,10 +262,11 @@ const initialMarkup = renderToStaticMarkup(
   }),
 )
 assert.equal(
-  initialMarkup.includes('Data belum lengkap'),
+  initialMarkup.includes('role="alert"'),
   false,
-  'Ringkasan validasi tidak boleh tampil pada render awal.',
+  'Error validasi tidak boleh tampil pada render awal.',
 )
+assert.equal(initialMarkup.includes('Masih ada data wajib'), false)
 assert.equal(
   initialMarkup.includes('Kepemilikan Gudang'),
   false,

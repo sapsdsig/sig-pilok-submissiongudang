@@ -57,11 +57,24 @@ sebelum membuat pola baru.
 - Tempatkan aksi final di ActionBar. Pada mobile, aksi utama memenuhi lebar.
 - Gunakan StatusBanner dengan variant info, success, warning, atau error;
   jangan membuat box status ad-hoc.
-- Setelah submit tidak valid, tampilkan ringkasan error dekat awal form dengan
-  StatusBanner error, pertahankan error inline di masing-masing field, lalu
-  arahkan scroll/fokus ke field tidak valid pertama jika memungkinkan.
-- Jangan tampilkan ringkasan error validasi sebelum pengguna mencoba submit;
-  sembunyikan kembali setelah form valid atau berhasil dikirim.
+
+### Field Validation
+
+- Jangan tampilkan error validasi saat form pertama kali dimuat. Indikator
+  field wajib tetap boleh ditampilkan.
+- Setelah submit tidak valid, tampilkan feedback tepat di samping atau di bawah
+  setiap field yang bermasalah dengan pesan yang menjelaskan secara spesifik
+  data yang kurang atau tidak valid.
+- Setelah percobaan submit pertama, validasi ulang field pada saat nilainya
+  berubah agar error langsung hilang ketika nilai sudah valid, sementara error
+  field lain tetap terlihat.
+- Arahkan smooth scroll dan fokus ke field tidak valid pertama sesuai urutan
+  visual/DOM.
+- Jangan gunakan ringkasan validasi generik pada level halaman untuk field
+  wajib biasa. Banner level halaman tetap digunakan untuk kegagalan sistem,
+  API, atau upload.
+- Field yang disembunyikan atau tidak lagi relevan karena kondisi tertentu
+  tidak boleh menampilkan error validasi.
 
 ## Spacing dan typography
 
