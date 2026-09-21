@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  compareIndonesianDates,
-  parseIndonesianDate,
+  compareNativeDates,
+  parseNativeDate,
 } from '../../utils/date'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -150,7 +150,7 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
             path: ['warehouses', index, 'mulaiSewa'],
             message: 'Tanggal mulai sewa wajib diisi.',
           })
-        } else if (!parseIndonesianDate(startDate)) {
+        } else if (!parseNativeDate(startDate)) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'mulaiSewa'],
@@ -164,15 +164,15 @@ export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
             path: ['warehouses', index, 'berakhirSewa'],
             message: 'Tanggal berakhir sewa wajib diisi.',
           })
-        } else if (!parseIndonesianDate(endDate)) {
+        } else if (!parseNativeDate(endDate)) {
           context.addIssue({
             code: 'custom',
             path: ['warehouses', index, 'berakhirSewa'],
             message: 'Tanggal berakhir sewa tidak valid.',
           })
         } else if (
-          parseIndonesianDate(startDate) &&
-          compareIndonesianDates(endDate, startDate) === -1
+          parseNativeDate(startDate) &&
+          compareNativeDates(endDate, startDate) === -1
         ) {
           context.addIssue({
             code: 'custom',

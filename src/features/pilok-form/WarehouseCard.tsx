@@ -257,12 +257,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
               </label>
               <input
                 id={`warehouse-${index}-start`}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="DD:MM:YYYY"
-                pattern="[0-9]{2}:[0-9]{2}:[0-9]{4}"
-                maxLength={10}
+                type="date"
                 aria-invalid={Boolean(warehouseErrors?.mulaiSewa)}
                 className={`${inputClass} ${warehouseErrors?.mulaiSewa ? 'border-red-500' : ''}`}
                 {...register(`warehouses.${index}.mulaiSewa`, {
@@ -278,12 +273,8 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
               </label>
               <input
                 id={`warehouse-${index}-end`}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder="DD:MM:YYYY"
-                pattern="[0-9]{2}:[0-9]{2}:[0-9]{4}"
-                maxLength={10}
+                type="date"
+                min={getValues(`warehouses.${index}.mulaiSewa`) || undefined}
                 aria-invalid={Boolean(warehouseErrors?.berakhirSewa)}
                 className={`${inputClass} ${warehouseErrors?.berakhirSewa ? 'border-red-500' : ''}`}
                 {...register(`warehouses.${index}.berakhirSewa`)}

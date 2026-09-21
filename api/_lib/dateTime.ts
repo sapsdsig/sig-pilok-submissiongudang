@@ -1,3 +1,5 @@
+import { isValidCalendarDateParts } from '../../src/utils/date.js'
+
 const WIB_FORMATTER = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'Asia/Jakarta',
   year: 'numeric',
@@ -10,6 +12,8 @@ const WIB_FORMATTER = new Intl.DateTimeFormat('en-CA', {
 })
 
 const WIB_TIMESTAMP_PATTERN =
+  /^(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2}):(\d{2})$/
+const LEGACY_WIB_TIMESTAMP_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
 const LEGACY_UTC_TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/
@@ -33,24 +37,19 @@ export function getWibTimestamp(now = new Date()): string {
   const hour = formatterPart(parts, 'hour')
   const minute = formatterPart(parts, 'minute')
   const second = formatterPart(parts, 'second')
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  return `${day}-${month}-${year} ${hour}:${minute}:${second}`
 }
 
-function isValidWibTimestamp(value: string): boolean {
-  const match = WIB_TIMESTAMP_PATTERN.exec(value)
-  if (!match) return false
-
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const hour = Number(match[4])
-  const minute = Number(match[5])
-  const second = Number(match[6])
-  const parsed = new Date(Date.UTC(year, month - 1, day))
+function validTimestampParts(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): boolean {
   return (
-    parsed.getUTCFullYear() === year &&
-    parsed.getUTCMonth() === month - 1 &&
-    parsed.getUTCDate() === day &&
+    isValidCalendarDateParts({ year, month, day }) &&
     hour >= 0 &&
     hour <= 23 &&
     minute >= 0 &&
@@ -60,8 +59,36 @@ function isValidWibTimestamp(value: string): boolean {
   )
 }
 
+function isValidWibTimestamp(value: string): boolean {
+  const match = WIB_TIMESTAMP_PATTERN.exec(value)
+  if (!match) return false
+  return validTimestampParts(
+    Number(match[3]),
+    Number(match[2]),
+    Number(match[1]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6]),
+  )
+}
+
+function isValidLegacyWibTimestamp(value: string): boolean {
+  const match = LEGACY_WIB_TIMESTAMP_PATTERN.exec(value)
+  if (!match) return false
+  return validTimestampParts(
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6]),
+  )
+}
+
 export function isSupportedStoredTimestamp(value: string): boolean {
-  if (isValidWibTimestamp(value)) return true
+  if (isValidWibTimestamp(value) || isValidLegacyWibTimestamp(value)) {
+    return true
+  }
   return (
     LEGACY_UTC_TIMESTAMP_PATTERN.test(value) &&
     Number.isFinite(Date.parse(value))

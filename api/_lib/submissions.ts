@@ -7,7 +7,10 @@ import type {
   WarehouseMaster,
   WarehouseSubmission,
 } from '../../src/types/domain.js'
-import { normalizeStoredRentalDate } from '../../src/utils/date.js'
+import {
+  formatPersistedRentalDate,
+  normalizeStoredRentalDate,
+} from '../../src/utils/date.js'
 import {
   getWibTimestamp,
   isSupportedStoredTimestamp,
@@ -248,7 +251,7 @@ export async function getExistingSubmission(
   }
 }
 
-function warehouseRecord(
+export function warehouseRecord(
   pilok: Pilok,
   warehouse: WarehouseSubmission,
   updatedAt: string,
@@ -284,8 +287,8 @@ function warehouseRecord(
   }
   return {
     ...base,
-    mulai_sewa: warehouse.mulaiSewa,
-    berakhir_sewa: warehouse.berakhirSewa,
+    mulai_sewa: formatPersistedRentalDate(warehouse.mulaiSewa),
+    berakhir_sewa: formatPersistedRentalDate(warehouse.berakhirSewa),
     bukti_sewa_file_id: warehouse.buktiSewa.fileId,
     bukti_sewa_file_name: warehouse.buktiSewa.fileName,
     bukti_sewa_url: warehouse.buktiSewa.url,

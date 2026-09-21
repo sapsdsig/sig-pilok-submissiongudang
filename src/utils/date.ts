@@ -4,8 +4,9 @@ export interface CalendarDateParts {
   year: number
 }
 
-const INDONESIAN_DATE_PATTERN = /^(\d{2}):(\d{2}):(\d{4})$/
-const LEGACY_ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const NATIVE_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const PERSISTED_DATE_PATTERN = /^(\d{2})-(\d{2})-(\d{4})$/
+const LEGACY_COLON_DATE_PATTERN = /^(\d{2}):(\d{2}):(\d{4})$/
 
 const isLeapYear = (year: number) =>
   year % 400 === 0 || (year % 4 === 0 && year % 100 !== 0)
@@ -33,33 +34,43 @@ export function isValidCalendarDateParts({
   )
 }
 
-export function parseIndonesianDate(
+function parseDateParts(
   value: string,
+  pattern: RegExp,
+  indexes: { day: number; month: number; year: number },
 ): CalendarDateParts | null {
-  const match = INDONESIAN_DATE_PATTERN.exec(value)
+  const match = pattern.exec(value)
   if (!match) return null
 
   const parts = {
-    day: Number(match[1]),
-    month: Number(match[2]),
-    year: Number(match[3]),
+    day: Number(match[indexes.day]),
+    month: Number(match[indexes.month]),
+    year: Number(match[indexes.year]),
   }
   return isValidCalendarDateParts(parts) ? parts : null
 }
 
-export function formatIndonesianDate(parts: CalendarDateParts): string {
+export function parseNativeDate(value: string): CalendarDateParts | null {
+  return parseDateParts(value, NATIVE_DATE_PATTERN, {
+    day: 3,
+    month: 2,
+    year: 1,
+  })
+}
+
+export function formatNativeDate(parts: CalendarDateParts): string {
   if (!isValidCalendarDateParts(parts)) {
     throw new RangeError('Tanggal kalender tidak valid.')
   }
-  return `${String(parts.day).padStart(2, '0')}:${String(parts.month).padStart(2, '0')}:${String(parts.year).padStart(4, '0')}`
+  return `${String(parts.year).padStart(4, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
 }
 
-export function compareIndonesianDates(
+export function compareNativeDates(
   left: string,
   right: string,
 ): number | null {
-  const leftParts = parseIndonesianDate(left)
-  const rightParts = parseIndonesianDate(right)
+  const leftParts = parseNativeDate(left)
+  const rightParts = parseNativeDate(right)
   if (!leftParts || !rightParts) return null
 
   const leftKey =
@@ -69,18 +80,27 @@ export function compareIndonesianDates(
   return Math.sign(leftKey - rightKey)
 }
 
-export function normalizeStoredRentalDate(value: string): string {
-  const current = parseIndonesianDate(value)
-  if (current) return formatIndonesianDate(current)
+export function formatPersistedRentalDate(value: string): string {
+  const parts = parseNativeDate(value)
+  if (!parts) throw new RangeError('Tanggal sewa internal tidak valid.')
+  return `${String(parts.day).padStart(2, '0')}-${String(parts.month).padStart(2, '0')}-${String(parts.year).padStart(4, '0')}`
+}
 
-  const legacy = LEGACY_ISO_DATE_PATTERN.exec(value)
-  if (!legacy) return value
-  const legacyParts = {
-    day: Number(legacy[3]),
-    month: Number(legacy[2]),
-    year: Number(legacy[1]),
-  }
-  return isValidCalendarDateParts(legacyParts)
-    ? formatIndonesianDate(legacyParts)
-    : value
+export function normalizeStoredRentalDate(value: string): string {
+  const persisted = parseDateParts(value, PERSISTED_DATE_PATTERN, {
+    day: 1,
+    month: 2,
+    year: 3,
+  })
+  if (persisted) return formatNativeDate(persisted)
+
+  const native = parseNativeDate(value)
+  if (native) return formatNativeDate(native)
+
+  const legacyColon = parseDateParts(value, LEGACY_COLON_DATE_PATTERN, {
+    day: 1,
+    month: 2,
+    year: 3,
+  })
+  return legacyColon ? formatNativeDate(legacyColon) : value
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  compareIndonesianDates,
-  parseIndonesianDate,
+  compareNativeDates,
+  parseNativeDate,
 } from '../../src/utils/date.js'
 import type {
   Pilok,
@@ -39,14 +39,14 @@ const rentedWarehouseSchema = z
     kodeGudang: z.string().trim().min(1),
     status: z.literal('Aktif'),
     kepemilikan: z.literal('Sewa'),
-    mulaiSewa: z.string().refine((value) => parseIndonesianDate(value)),
-    berakhirSewa: z.string().refine((value) => parseIndonesianDate(value)),
+    mulaiSewa: z.string().refine((value) => parseNativeDate(value)),
+    berakhirSewa: z.string().refine((value) => parseNativeDate(value)),
     buktiSewa: documentSchema,
   })
   .strict()
   .superRefine((warehouse, context) => {
     if (
-      compareIndonesianDates(
+      compareNativeDates(
         warehouse.berakhirSewa,
         warehouse.mulaiSewa,
       ) === -1

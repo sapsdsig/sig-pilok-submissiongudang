@@ -116,14 +116,17 @@ contoh di atas.
 
 ### Date and Time
 
-- Tanggal kalender yang diinput pengguna menggunakan format `DD:MM:YYYY`,
-  misalnya `18:09:2026`. Tampilkan format ini melalui placeholder atau helper
-  text pada field terkait.
-- Validasi tanggal harus memisahkan komponen hari, bulan, dan tahun secara
-  eksplisit. Jangan mengandalkan parsing `Date` yang bergantung locale browser
-  atau server.
+- Field tanggal kalender menggunakan native date control (`type="date"`) jika
+  memungkinkan agar pengguna tetap mendapatkan calendar picker browser. Jangan
+  mengganti native date control hanya untuk memaksakan format visual tertentu.
+- Nilai internal native date input boleh menggunakan format `YYYY-MM-DD`.
+  Tanggal kalender yang dipersistensikan ke spreadsheet PILOK menggunakan
+  format `DD-MM-YYYY`.
+- Konversi, validasi, dan perbandingan tanggal harus memisahkan komponen hari,
+  bulan, dan tahun secara eksplisit melalui helper bersama. Jangan mengandalkan
+  parsing `Date` yang bergantung locale browser atau server.
 - Timestamp sistem pada form operasional PILOK menggunakan WIB dengan timezone
-  eksplisit `Asia/Jakarta` dan format `YYYY-MM-DD HH:mm:ss`.
+  eksplisit `Asia/Jakarta` dan format `DD-MM-YYYY HH:mm:ss`.
 - Timestamp dibuat oleh server; jangan memakai jam browser atau timezone lokal
   runtime secara implisit.
 
