@@ -47,6 +47,21 @@ sebelum membuat pola baru.
 - Upload memakai upload-box saat kosong dan file-selected untuk file baru atau
   tersimpan. Jangan mengubah semantics file untuk kebutuhan visual.
 
+### Nilai tersimpan yang dikendalikan
+
+- Nilai tersimpan yang tidak boleh berubah tanpa sengaja dapat ditampilkan
+  sebagai field readonly dengan kontras yang tetap jelas dan aksi `Ubah` yang
+  eksplisit untuk masuk ke mode edit.
+- Nilai wajib yang masih kosong harus langsung memakai control editable; jangan
+  mengharuskan pengguna menekan `Ubah` untuk melengkapinya.
+- Masuk ke mode edit bukan perubahan data. Aturan perubahan membandingkan nilai
+  awal tersimpan dengan nilai akhir, termasuk ketika pengguna mengembalikan
+  pilihannya ke nilai awal.
+- Validasi kondisional tetap live dan mengikuti perubahan nilai akhir yang
+  benar-benar berlaku, bukan sekadar apakah mode edit pernah dibuka.
+- Aksi edit memakai button yang dapat dijangkau keyboard, memiliki focus state,
+  tidak men-submit form, dan tetap aman dari overflow pada mobile.
+
 ## Actions dan feedback
 
 - button-primary: satu aksi simpan atau lanjut utama per area.

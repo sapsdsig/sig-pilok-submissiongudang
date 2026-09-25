@@ -4,14 +4,17 @@ import {
   parseNativeDate,
 } from '../../src/utils/date.js'
 import type {
+  ExistingWarehouse,
   Pilok,
   PilokSubmissionRequest,
   WarehouseMaster,
   WarehouseSubmissionRequest,
 } from '../../src/types/domain.js'
+import { requiresNewOwnershipEvidence } from '../../src/utils/warehouseState.js'
 import { verifyDriveDocument } from './drive.js'
 import { ApiError } from './errors.js'
 import { getPilokByCode, getWarehousesByPilok } from './masterData.js'
+import { getExistingSubmission } from './submissions.js'
 
 const documentSchema = z
   .object({
@@ -26,7 +29,7 @@ const ownedWarehouseSchema = z
     kodeGudang: z.string().trim().min(1),
     status: z.literal('Aktif'),
     kepemilikan: z.literal('Milik Sendiri'),
-    shm: documentSchema,
+    shm: documentSchema.optional(),
   })
   .strict()
 
@@ -35,13 +38,15 @@ const rentedWarehouseSchema = z
     kodeGudang: z.string().trim().min(1),
     status: z.literal('Aktif'),
     kepemilikan: z.literal('Sewa'),
-    mulaiSewa: z.string().refine((value) => parseNativeDate(value)),
-    berakhirSewa: z.string().refine((value) => parseNativeDate(value)),
-    buktiSewa: documentSchema,
+    mulaiSewa: z.string().refine((value) => parseNativeDate(value)).optional(),
+    berakhirSewa: z.string().refine((value) => parseNativeDate(value)).optional(),
+    buktiSewa: documentSchema.optional(),
   })
   .strict()
   .superRefine((warehouse, context) => {
     if (
+      warehouse.mulaiSewa &&
+      warehouse.berakhirSewa &&
       compareNativeDates(
         warehouse.berakhirSewa,
         warehouse.mulaiSewa,
@@ -84,6 +89,86 @@ export interface ValidatedSubmission {
   pilok: Pilok
   request: PilokSubmissionRequest
   warehouseMasters: ReadonlyMap<string, WarehouseMaster>
+}
+
+type ParsedSubmissionWarehouse = z.infer<typeof submissionWarehouseSchema>
+type DocumentVerifier = typeof verifyDriveDocument
+
+export async function normalizeWarehouseAgainstExisting(
+  warehouse: ParsedSubmissionWarehouse,
+  master: WarehouseMaster,
+  existing: ExistingWarehouse | undefined,
+  verifyDocument: DocumentVerifier = verifyDriveDocument,
+): Promise<WarehouseSubmissionRequest> {
+  if (warehouse.status === 'Tidak Aktif') {
+    return {
+      kodeGudang: master.kodeGudang,
+      status: 'Tidak Aktif',
+      kepemilikan: '',
+    }
+  }
+
+  const evidenceRequired = requiresNewOwnershipEvidence({
+    originalStatus: existing?.status ?? '',
+    originalOwnership: existing?.kepemilikan ?? '',
+    finalStatus: warehouse.status,
+    finalOwnership: warehouse.kepemilikan,
+  })
+
+  if (warehouse.kepemilikan === 'Milik Sendiri') {
+    if (!evidenceRequired) {
+      return {
+        kodeGudang: master.kodeGudang,
+        status: 'Aktif',
+        kepemilikan: 'Milik Sendiri',
+        shm: existing?.shm,
+      }
+    }
+    if (!warehouse.shm) {
+      throw new ApiError(
+        400,
+        'SUBMISSION_INVALID',
+        'Dokumen SHM wajib diunggah untuk perubahan kepemilikan gudang.',
+      )
+    }
+    const shm = await verifyDocument(warehouse.shm.fileId, 'SHM')
+    return {
+      kodeGudang: master.kodeGudang,
+      status: 'Aktif',
+      kepemilikan: 'Milik Sendiri',
+      shm,
+    }
+  }
+
+  if (!evidenceRequired) {
+    return {
+      kodeGudang: master.kodeGudang,
+      status: 'Aktif',
+      kepemilikan: 'Sewa',
+      mulaiSewa: existing?.mulaiSewa,
+      berakhirSewa: existing?.berakhirSewa,
+      buktiSewa: existing?.buktiSewa,
+    }
+  }
+  if (!warehouse.mulaiSewa || !warehouse.berakhirSewa || !warehouse.buktiSewa) {
+    throw new ApiError(
+      400,
+      'SUBMISSION_INVALID',
+      'Tanggal dan Bukti Sewa wajib dilengkapi untuk perubahan kepemilikan gudang.',
+    )
+  }
+  const buktiSewa = await verifyDocument(
+    warehouse.buktiSewa.fileId,
+    'BUKTI_SEWA',
+  )
+  return {
+    kodeGudang: master.kodeGudang,
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    mulaiSewa: warehouse.mulaiSewa,
+    berakhirSewa: warehouse.berakhirSewa,
+    buktiSewa,
+  }
 }
 
 export function validateWarehouseMembership(
@@ -156,6 +241,16 @@ export async function validateAndNormalizeSubmission(
     codes,
     currentWarehouses,
   )
+  const existingSubmission = await getExistingSubmission(
+    pilok,
+    new Set(warehouseMasters.keys()),
+  )
+  const existingByCode = new Map(
+    existingSubmission?.warehouses.map((warehouse) => [
+      warehouse.kodeGudang,
+      warehouse,
+    ]) ?? [],
+  )
 
   const normalizedWarehouses = await Promise.all(
     parsedWarehouses.data.map(
@@ -169,36 +264,11 @@ export async function validateAndNormalizeSubmission(
           )
         }
 
-        if (warehouse.status === 'Tidak Aktif') {
-          return {
-            kodeGudang: master.kodeGudang,
-            status: 'Tidak Aktif',
-            kepemilikan: '',
-          }
-        }
-
-        if (warehouse.kepemilikan === 'Milik Sendiri') {
-          const shm = await verifyDriveDocument(warehouse.shm.fileId, 'SHM')
-          return {
-            kodeGudang: master.kodeGudang,
-            status: warehouse.status,
-            kepemilikan: 'Milik Sendiri',
-            shm,
-          }
-        }
-
-        const buktiSewa = await verifyDriveDocument(
-          warehouse.buktiSewa.fileId,
-          'BUKTI_SEWA',
+        return normalizeWarehouseAgainstExisting(
+          warehouse,
+          master,
+          existingByCode.get(master.kodeGudang),
         )
-        return {
-          kodeGudang: master.kodeGudang,
-          status: warehouse.status,
-          kepemilikan: 'Sewa',
-          mulaiSewa: warehouse.mulaiSewa,
-          berakhirSewa: warehouse.berakhirSewa,
-          buktiSewa,
-        }
       },
     ),
   )

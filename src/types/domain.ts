@@ -29,15 +29,15 @@ interface SubmittedWarehouseBase {
 export interface OwnedWarehouseSubmission extends SubmittedWarehouseBase {
   status: 'Aktif'
   kepemilikan: 'Milik Sendiri'
-  shm: DriveDocumentReference
+  shm?: DriveDocumentReference
 }
 
 export interface RentedWarehouseSubmission extends SubmittedWarehouseBase {
   status: 'Aktif'
   kepemilikan: 'Sewa'
-  mulaiSewa: string
-  berakhirSewa: string
-  buktiSewa: DriveDocumentReference
+  mulaiSewa?: string
+  berakhirSewa?: string
+  buktiSewa?: DriveDocumentReference
 }
 
 export interface InactiveWarehouseSubmission extends SubmittedWarehouseBase {
@@ -85,16 +85,16 @@ export interface OwnedWarehouseRequest {
   kodeGudang: string
   status: 'Aktif'
   kepemilikan: 'Milik Sendiri'
-  shm: DriveDocumentReference
+  shm?: DriveDocumentReference
 }
 
 export interface RentedWarehouseRequest {
   kodeGudang: string
   status: 'Aktif'
   kepemilikan: 'Sewa'
-  mulaiSewa: string
-  berakhirSewa: string
-  buktiSewa: DriveDocumentReference
+  mulaiSewa?: string
+  berakhirSewa?: string
+  buktiSewa?: DriveDocumentReference
 }
 
 export interface InactiveWarehouseRequest {

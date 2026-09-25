@@ -8,6 +8,7 @@ import {
   isSupportedStoredTimestamp,
 } from '../api/_lib/dateTime.js'
 import {
+  normalizeWarehouseAgainstExisting,
   submissionEnvelopeSchema,
   submissionWarehouseSchema,
   validateWarehouseMembership,
@@ -41,6 +42,7 @@ import {
   normalizeStoredRentalDate,
   parseNativeDate,
 } from '../src/utils/date.js'
+import { requiresNewOwnershipEvidence } from '../src/utils/warehouseState.js'
 
 Object.assign(globalThis, { React })
 const { PilokMainForm } = await import(
@@ -205,6 +207,8 @@ const baseWarehouse: WarehouseFormValues = {
   kodeGudang: 'G001',
   namaGudang: 'Gudang QA',
   kapasitasGudang: 100,
+  originalStatus: '',
+  originalKepemilikan: '',
   status: 'Aktif',
   kepemilikan: '',
 }
@@ -319,7 +323,9 @@ assert.deepEqual(
       kepemilikan: 'Sewa',
       mulaiSewa: '2026-12-31',
       berakhirSewa: '2026-01-01',
-      existingBuktiSewa: existingDocument,
+      buktiSewa: new File(['pdf'], 'sewa.pdf', {
+        type: 'application/pdf',
+      }),
     }),
   ),
   [
@@ -347,6 +353,67 @@ assert.deepEqual(
     }),
   ),
   ['Ukuran file maksimal 10 MB.'],
+)
+assert.equal(
+  schema.safeParse(
+    valuesWith({
+      ...baseWarehouse,
+      originalStatus: 'Aktif',
+      originalKepemilikan: 'Milik Sendiri',
+      kepemilikan: 'Milik Sendiri',
+    }),
+  ).success,
+  true,
+  'Milik Sendiri existing yang tidak berubah tidak memerlukan SHM baru.',
+)
+assert.equal(
+  schema.safeParse(
+    valuesWith({
+      ...baseWarehouse,
+      originalStatus: 'Aktif',
+      originalKepemilikan: 'Sewa',
+      kepemilikan: 'Sewa',
+    }),
+  ).success,
+  true,
+  'Sewa existing yang tidak berubah tidak memerlukan evidence baru.',
+)
+assert.deepEqual(
+  validationMessages(
+    valuesWith({
+      ...baseWarehouse,
+      originalStatus: 'Aktif',
+      originalKepemilikan: 'Sewa',
+      kepemilikan: 'Milik Sendiri',
+    }),
+  ),
+  ['Dokumen SHM wajib diunggah.'],
+)
+assert.deepEqual(
+  validationMessages(
+    valuesWith({
+      ...baseWarehouse,
+      originalStatus: 'Aktif',
+      originalKepemilikan: 'Milik Sendiri',
+      kepemilikan: 'Sewa',
+    }),
+  ),
+  [
+    'Tanggal mulai sewa wajib diisi.',
+    'Tanggal berakhir sewa wajib diisi.',
+    'Bukti sewa wajib diunggah.',
+  ],
+)
+assert.deepEqual(
+  validationMessages(
+    valuesWith({
+      ...baseWarehouse,
+      originalStatus: 'Tidak Aktif',
+      originalKepemilikan: '',
+      kepemilikan: 'Milik Sendiri',
+    }),
+  ),
+  ['Dokumen SHM wajib diunggah.'],
 )
 
 const liveForm = createFormControl<PilokFormValues>({
@@ -507,8 +574,8 @@ assert.equal(
     status: 'Aktif',
     kepemilikan: 'Milik Sendiri',
   }).success,
-  false,
-  'Server tetap menolak gudang milik sendiri tanpa SHM.',
+  true,
+  'Schema transport menerima evidence opsional agar server dapat membandingkan state tersimpan.',
 )
 assert.equal(
   submissionWarehouseSchema.safeParse({
@@ -516,8 +583,8 @@ assert.equal(
     status: 'Aktif',
     kepemilikan: 'Sewa',
   }).success,
-  false,
-  'Server tetap menolak gudang sewa yang tidak lengkap.',
+  true,
+  'Schema transport menerima gudang sewa tanpa evidence sebelum validasi baseline server.',
 )
 assert.equal(
   submissionWarehouseSchema.safeParse({
@@ -556,10 +623,218 @@ assert.equal(
   'Server menolak tanggal berakhir sebelum tanggal mulai.',
 )
 
+assert.equal(
+  requiresNewOwnershipEvidence({
+    originalStatus: 'Aktif',
+    originalOwnership: 'Sewa',
+    finalStatus: 'Aktif',
+    finalOwnership: 'Sewa',
+  }),
+  false,
+  'Nilai akhir yang kembali ke baseline tidak dianggap berubah.',
+)
+assert.equal(
+  requiresNewOwnershipEvidence({
+    originalStatus: 'Aktif',
+    originalOwnership: 'Sewa',
+    finalStatus: 'Aktif',
+    finalOwnership: 'Milik Sendiri',
+  }),
+  true,
+)
+assert.equal(
+  requiresNewOwnershipEvidence({
+    originalStatus: 'Tidak Aktif',
+    originalOwnership: '',
+    finalStatus: 'Aktif',
+    finalOwnership: 'Sewa',
+  }),
+  true,
+)
+
+const parseServerWarehouse = (input: unknown) => {
+  const result = submissionWarehouseSchema.safeParse(input)
+  assert.equal(result.success, true)
+  if (!result.success) throw new Error('Fixture gudang server tidak valid.')
+  return result.data
+}
+const serverMaster = membershipMasters[0]!
+const existingOwnedWithoutEvidence = {
+  kodeGudang: 'A',
+  namaGudang: 'Gudang A',
+  kapasitasGudang: 100,
+  status: 'Aktif' as const,
+  kepemilikan: 'Milik Sendiri' as const,
+  updatedAt: '21-09-2026 10:14:32',
+}
+const existingRentalWithoutEvidence = {
+  ...existingOwnedWithoutEvidence,
+  kepemilikan: 'Sewa' as const,
+}
+const fakeDocumentVerifier = async (fileId: string) => ({
+  fileId,
+  fileName: `${fileId}.pdf`,
+  url: `https://example.invalid/${fileId}`,
+})
+
+assert.deepEqual(
+  await normalizeWarehouseAgainstExisting(
+    parseServerWarehouse({
+      kodeGudang: 'A',
+      status: 'Aktif',
+      kepemilikan: 'Milik Sendiri',
+    }),
+    serverMaster,
+    existingOwnedWithoutEvidence,
+    fakeDocumentVerifier,
+  ),
+  {
+    kodeGudang: 'A',
+    status: 'Aktif',
+    kepemilikan: 'Milik Sendiri',
+    shm: undefined,
+  },
+  'Kepemilikan existing yang sama tidak memerlukan SHM lama.',
+)
+assert.deepEqual(
+  await normalizeWarehouseAgainstExisting(
+    parseServerWarehouse({
+      kodeGudang: 'A',
+      status: 'Aktif',
+      kepemilikan: 'Sewa',
+    }),
+    serverMaster,
+    existingRentalWithoutEvidence,
+    fakeDocumentVerifier,
+  ),
+  {
+    kodeGudang: 'A',
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    mulaiSewa: undefined,
+    berakhirSewa: undefined,
+    buktiSewa: undefined,
+  },
+  'Kepemilikan Sewa existing yang sama tidak memerlukan backfill evidence.',
+)
+await assert.rejects(
+  normalizeWarehouseAgainstExisting(
+    parseServerWarehouse({
+      kodeGudang: 'A',
+      status: 'Aktif',
+      kepemilikan: 'Milik Sendiri',
+    }),
+    serverMaster,
+    existingRentalWithoutEvidence,
+    fakeDocumentVerifier,
+  ),
+  /Dokumen SHM wajib diunggah/,
+)
+await assert.rejects(
+  normalizeWarehouseAgainstExisting(
+    parseServerWarehouse({
+      kodeGudang: 'A',
+      status: 'Aktif',
+      kepemilikan: 'Sewa',
+    }),
+    serverMaster,
+    existingOwnedWithoutEvidence,
+    fakeDocumentVerifier,
+  ),
+  /Tanggal dan Bukti Sewa wajib dilengkapi/,
+)
+assert.deepEqual(
+  await normalizeWarehouseAgainstExisting(
+    parseServerWarehouse({
+      kodeGudang: 'A',
+      status: 'Aktif',
+      kepemilikan: 'Milik Sendiri',
+      shm: { fileId: 'new-shm' },
+    }),
+    serverMaster,
+    existingRentalWithoutEvidence,
+    fakeDocumentVerifier,
+  ),
+  {
+    kodeGudang: 'A',
+    status: 'Aktif',
+    kepemilikan: 'Milik Sendiri',
+    shm: {
+      fileId: 'new-shm',
+      fileName: 'new-shm.pdf',
+      url: 'https://example.invalid/new-shm',
+    },
+  },
+)
+assert.deepEqual(
+  await normalizeWarehouseAgainstExisting(
+    parseServerWarehouse({
+      kodeGudang: 'A',
+      status: 'Aktif',
+      kepemilikan: 'Sewa',
+      mulaiSewa: '2026-09-21',
+      berakhirSewa: '2027-09-21',
+      buktiSewa: { fileId: 'new-sewa' },
+    }),
+    serverMaster,
+    existingOwnedWithoutEvidence,
+    fakeDocumentVerifier,
+  ),
+  {
+    kodeGudang: 'A',
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    mulaiSewa: '2026-09-21',
+    berakhirSewa: '2027-09-21',
+    buktiSewa: {
+      fileId: 'new-sewa',
+      fileName: 'new-sewa.pdf',
+      url: 'https://example.invalid/new-sewa',
+    },
+  },
+)
+assert.deepEqual(
+  await normalizeWarehouseAgainstExisting(
+    parseServerWarehouse({
+      kodeGudang: 'A',
+      status: 'Tidak Aktif',
+      kepemilikan: '',
+    }),
+    serverMaster,
+    existingOwnedWithoutEvidence,
+    fakeDocumentVerifier,
+  ),
+  { kodeGudang: 'A', status: 'Tidak Aktif', kepemilikan: '' },
+)
+
 const originalUploadDocument = uploadService.uploadDocument.bind(uploadService)
+const retriedOwnedValues = valuesWith({
+  ...baseWarehouse,
+  kepemilikan: 'Milik Sendiri',
+  existingShm: existingDocument,
+})
+assert.equal(
+  schema.safeParse(retriedOwnedValues).success,
+  true,
+  'Referensi upload baru harus dapat dipakai kembali setelah Save sebelumnya gagal.',
+)
+assert.deepEqual(
+  (await buildSubmissionPayload(retriedOwnedValues, () => undefined))
+    .warehouses,
+  [
+    {
+      kodeGudang: 'G001',
+      status: 'Aktif',
+      kepemilikan: 'Milik Sendiri',
+      shm: existingDocument,
+    },
+  ],
+)
 const persistedRentalPayload = await buildSubmissionPayload(
   valuesWith({
     ...baseWarehouse,
+    originalStatus: 'Aktif',
+    originalKepemilikan: 'Sewa',
     kepemilikan: 'Sewa',
     mulaiSewa: '2026-05-01',
     berakhirSewa: '2026-12-31',
@@ -572,9 +847,6 @@ assert.deepEqual(persistedRentalPayload.warehouses, [
     kodeGudang: 'G001',
     status: 'Aktif',
     kepemilikan: 'Sewa',
-    mulaiSewa: '2026-05-01',
-    berakhirSewa: '2026-12-31',
-    buktiSewa: existingDocument,
   },
 ])
 assert.equal('adaPerubahan' in persistedRentalPayload, false)
@@ -863,18 +1135,15 @@ const incompleteRental = mergeWarehouseFormValues(
     ],
   },
 )
-assert.deepEqual(
-  validationMessages({
+assert.equal(
+  schema.safeParse({
     kodePilok: '10001',
     namaDistributor: 'Distributor QA',
     areaName: 'Area QA',
     warehouses: incompleteRental,
-  }),
-  [
-    'Tanggal mulai sewa wajib diisi.',
-    'Tanggal berakhir sewa wajib diisi.',
-    'Bukti sewa wajib diunggah.',
-  ],
+  }).success,
+  true,
+  'Kepemilikan Sewa tersimpan tidak memaksa backfill bukti lama.',
 )
 
 const incompleteOwnership = mergeWarehouseFormValues(
@@ -946,6 +1215,8 @@ assert.equal(
 )
 assert.equal(initialMarkup.includes('Masih ada data wajib'), false)
 assert.equal(initialMarkup.includes('Apakah Ada Perubahan'), false)
+assert.equal(initialMarkup.includes('Ganti Kode PILOK'), true)
+assert.equal(initialMarkup.includes('>Ganti PILOK<'), false)
 assert.equal(
   initialMarkup.includes(
     'Data yang ditampilkan pada menu ini merupakan data pada database MDXL dan telah digunakan di Evaluasi HY 2026',
@@ -995,8 +1266,19 @@ const activeRentalMarkup = renderToStaticMarkup(
 )
 assert.equal(
   (activeRentalMarkup.match(/type="date"/g) ?? []).length,
-  2,
-  'Mulai dan Berakhir Sewa harus tetap memakai native date input.',
+  0,
+  'Evidence sewa tidak ditampilkan untuk kepemilikan tersimpan yang tidak berubah.',
 )
+assert.equal(
+  (activeRentalMarkup.match(/>Ubah<\/button>/g) ?? []).length,
+  2,
+  'Status dan kepemilikan tersimpan masing-masing memiliki aksi Ubah.',
+)
+assert.equal(
+  (activeRentalMarkup.match(/aria-readonly="true"/g) ?? []).length,
+  2,
+  'Status dan kepemilikan tersimpan tampil sebagai field readonly.',
+)
+assert.equal(activeRentalMarkup.includes('Upload Bukti Sewa'), false)
 
 process.stdout.write('QA verification passed.\n')

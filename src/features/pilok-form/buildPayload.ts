@@ -5,6 +5,7 @@ import type {
   WarehouseStatus,
   WarehouseSubmissionRequest,
 } from '../../types/domain'
+import { requiresNewOwnershipEvidence } from '../../utils/warehouseState'
 import type { PilokFormValues, WarehouseFormValues } from './formTypes'
 
 const isWarehouseStatus = (value: string): value is WarehouseStatus =>
@@ -62,7 +63,21 @@ export async function buildSubmissionPayload(
           }
         }
 
+        const evidenceRequired = requiresNewOwnershipEvidence({
+          originalStatus: warehouse.originalStatus,
+          originalOwnership: warehouse.originalKepemilikan,
+          finalStatus: warehouse.status,
+          finalOwnership: warehouse.kepemilikan,
+        })
+
         if (warehouse.kepemilikan === 'Milik Sendiri') {
+          if (!evidenceRequired) {
+            return {
+              kodeGudang: warehouse.kodeGudang.trim(),
+              status: 'Aktif',
+              kepemilikan: 'Milik Sendiri',
+            }
+          }
           const shm = await resolveDocument({
             values,
             warehouse,
@@ -81,11 +96,17 @@ export async function buildSubmissionPayload(
           }
         }
 
-        if (
-          warehouse.kepemilikan === 'Sewa' &&
-          warehouse.mulaiSewa &&
-          warehouse.berakhirSewa
-        ) {
+        if (warehouse.kepemilikan === 'Sewa') {
+          if (!evidenceRequired) {
+            return {
+              kodeGudang: warehouse.kodeGudang.trim(),
+              status: 'Aktif',
+              kepemilikan: 'Sewa',
+            }
+          }
+          if (!warehouse.mulaiSewa || !warehouse.berakhirSewa) {
+            throw new Error('Data kepemilikan gudang tidak lengkap.')
+          }
           const buktiSewa = await resolveDocument({
             values,
             warehouse,

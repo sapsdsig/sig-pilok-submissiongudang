@@ -278,6 +278,7 @@ export function warehouseRecord(
   if (warehouse.status === 'Tidak Aktif') return base
 
   if (warehouse.kepemilikan === 'Milik Sendiri') {
+    if (!warehouse.shm) return base
     return {
       ...base,
       shm_file_id: warehouse.shm.fileId,
@@ -287,11 +288,15 @@ export function warehouseRecord(
   }
   return {
     ...base,
-    mulai_sewa: formatPersistedRentalDate(warehouse.mulaiSewa),
-    berakhir_sewa: formatPersistedRentalDate(warehouse.berakhirSewa),
-    bukti_sewa_file_id: warehouse.buktiSewa.fileId,
-    bukti_sewa_file_name: warehouse.buktiSewa.fileName,
-    bukti_sewa_url: warehouse.buktiSewa.url,
+    mulai_sewa: warehouse.mulaiSewa
+      ? formatPersistedRentalDate(warehouse.mulaiSewa)
+      : '',
+    berakhir_sewa: warehouse.berakhirSewa
+      ? formatPersistedRentalDate(warehouse.berakhirSewa)
+      : '',
+    bukti_sewa_file_id: warehouse.buktiSewa?.fileId ?? '',
+    bukti_sewa_file_name: warehouse.buktiSewa?.fileName ?? '',
+    bukti_sewa_url: warehouse.buktiSewa?.url ?? '',
   }
 }
 

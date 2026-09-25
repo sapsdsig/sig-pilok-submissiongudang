@@ -22,12 +22,23 @@ export function mergeWarehouseFormValues(
       kodeGudang: master.kodeGudang,
       namaGudang: master.namaGudang,
       kapasitasGudang: master.kapasitasGudang,
+      originalStatus: existing?.status ?? '',
+      originalKepemilikan: isInactive
+        ? ''
+        : (existing?.kepemilikan ?? ''),
       status: existing?.status ?? '',
       kepemilikan: isInactive ? '' : (existing?.kepemilikan ?? ''),
       mulaiSewa: isInactive ? undefined : existing?.mulaiSewa,
       berakhirSewa: isInactive ? undefined : existing?.berakhirSewa,
-      existingShm: isInactive ? undefined : existing?.shm,
-      existingBuktiSewa: isInactive ? undefined : existing?.buktiSewa,
+      existingShm:
+        existing?.status === 'Aktif' &&
+        existing.kepemilikan === 'Milik Sendiri'
+          ? existing.shm
+          : undefined,
+      existingBuktiSewa:
+        existing?.status === 'Aktif' && existing.kepemilikan === 'Sewa'
+          ? existing.buktiSewa
+          : undefined,
     }
   })
 }

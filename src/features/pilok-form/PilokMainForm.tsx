@@ -130,7 +130,7 @@ export function PilokMainForm({
             onClick={onBack}
             className="button-secondary"
           >
-            Ganti PILOK
+            Ganti Kode PILOK
           </button>
         </div>
 

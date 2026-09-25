@@ -3,6 +3,7 @@ import {
   compareNativeDates,
   parseNativeDate,
 } from '../../utils/date'
+import { requiresNewOwnershipEvidence } from '../../utils/warehouseState'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -20,6 +21,16 @@ const warehouseSchema = z.object({
   kodeGudang: z.string(),
   namaGudang: z.string(),
   kapasitasGudang: z.number().nonnegative(),
+  originalStatus: z.union([
+    z.literal(''),
+    z.literal('Aktif'),
+    z.literal('Tidak Aktif'),
+  ]),
+  originalKepemilikan: z.union([
+    z.literal(''),
+    z.literal('Milik Sendiri'),
+    z.literal('Sewa'),
+  ]),
   status: z.union([
     z.literal(''),
     z.literal('Aktif'),
@@ -117,6 +128,15 @@ export const createPilokFormSchema = () =>
           message: 'Kepemilikan Gudang wajib dipilih.',
         })
       }
+
+      const evidenceRequired = requiresNewOwnershipEvidence({
+        originalStatus: warehouse.originalStatus,
+        originalOwnership: warehouse.originalKepemilikan,
+        finalStatus: warehouse.status,
+        finalOwnership: warehouse.kepemilikan,
+      })
+
+      if (!evidenceRequired) return
 
       if (warehouse.kepemilikan === 'Milik Sendiri') {
         validatePdf(

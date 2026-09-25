@@ -7,6 +7,8 @@ export interface WarehouseFormValues {
   kodeGudang: string
   namaGudang: string
   kapasitasGudang: number
+  originalStatus: WarehouseStatusInput
+  originalKepemilikan: WarehouseOwnershipInput
   status: WarehouseStatusInput
   kepemilikan: WarehouseOwnershipInput
   mulaiSewa?: string

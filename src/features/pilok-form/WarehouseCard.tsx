@@ -1,7 +1,8 @@
-import type { ChangeEvent } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { Controller, useWatch, type UseFormReturn } from 'react-hook-form'
 import { FieldError } from '../../components/FieldError'
 import { ReadonlyField } from '../../components/ReadonlyField'
+import { requiresNewOwnershipEvidence } from '../../utils/warehouseState'
 import type { PilokFormValues } from './formTypes'
 
 interface WarehouseCardProps {
@@ -32,6 +33,14 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
     control,
     name: `warehouses.${index}.kepemilikan`,
   })
+  const originalStatus = useWatch({
+    control,
+    name: `warehouses.${index}.originalStatus`,
+  })
+  const originalOwnership = useWatch({
+    control,
+    name: `warehouses.${index}.originalKepemilikan`,
+  })
   const existingShm = useWatch({
     control,
     name: `warehouses.${index}.existingShm`,
@@ -52,6 +61,16 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
   const shmFileName = newShm?.name ?? existingShm?.fileName
   const rentalProofFileName =
     newBuktiSewa?.name ?? existingBuktiSewa?.fileName
+  const [statusUnlocked, setStatusUnlocked] = useState(false)
+  const [ownershipUnlocked, setOwnershipUnlocked] = useState(false)
+  const statusLocked = Boolean(originalStatus) && !statusUnlocked
+  const ownershipLocked = Boolean(originalOwnership) && !ownershipUnlocked
+  const evidenceRequired = requiresNewOwnershipEvidence({
+    originalStatus,
+    originalOwnership,
+    finalStatus: status,
+    finalOwnership: ownership,
+  })
 
   const ownershipRegistration = register(
     `warehouses.${index}.kepemilikan`,
@@ -79,6 +98,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
     await statusRegistration.onChange(event)
     if (event.target.value === 'Tidak Aktif') {
       clearOwnershipValues()
+      setOwnershipUnlocked(true)
     }
     await trigger(`warehouses.${index}`)
   }
@@ -148,47 +168,109 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
               valueAsNumber: true,
             })}
           />
+          <input
+            type="hidden"
+            {...register(`warehouses.${index}.originalStatus`)}
+          />
+          <input
+            type="hidden"
+            {...register(`warehouses.${index}.originalKepemilikan`)}
+          />
         </div>
 
         <div className="min-w-0 max-w-full">
-          <label htmlFor={`warehouse-${index}-status`} className={labelClass}>
+          <label
+            id={`warehouse-${index}-status-label`}
+            htmlFor={`warehouse-${index}-status`}
+            className={labelClass}
+          >
             Status Gudang <span className="text-red-600">*</span>
           </label>
-          <select
-            id={`warehouse-${index}-status`}
-            aria-invalid={Boolean(warehouseErrors?.status)}
-            className={`${inputClass} ${warehouseErrors?.status ? 'border-red-500' : ''}`}
-            {...statusRegistration}
-            onChange={handleStatusChange}
-          >
-            <option value="">Pilih status</option>
-            <option value="Aktif">Aktif</option>
-            <option value="Tidak Aktif">Tidak Aktif</option>
-          </select>
+          {statusLocked ? (
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+              <div
+                id={`warehouse-${index}-status`}
+                role="textbox"
+                aria-readonly="true"
+                aria-labelledby={`warehouse-${index}-status-label`}
+                className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700"
+              >
+                {status}
+              </div>
+              <button
+                type="button"
+                className="button-secondary shrink-0 self-start px-4 py-2 sm:self-auto"
+                onClick={() => setStatusUnlocked(true)}
+                aria-label={`Ubah Status Gudang ${master.kodeGudang}`}
+              >
+                Ubah
+              </button>
+            </div>
+          ) : (
+            <select
+              id={`warehouse-${index}-status`}
+              aria-invalid={Boolean(warehouseErrors?.status)}
+              className={`${inputClass} ${warehouseErrors?.status ? 'border-red-500' : ''}`}
+              {...statusRegistration}
+              onChange={handleStatusChange}
+            >
+              <option value="">Pilih status</option>
+              <option value="Aktif">Aktif</option>
+              <option value="Tidak Aktif">Tidak Aktif</option>
+            </select>
+          )}
           <FieldError message={warehouseErrors?.status?.message} />
         </div>
 
         {status !== 'Tidak Aktif' && (
           <div className="min-w-0 max-w-full">
-            <label htmlFor={`warehouse-${index}-ownership`} className={labelClass}>
+            <label
+              id={`warehouse-${index}-ownership-label`}
+              htmlFor={`warehouse-${index}-ownership`}
+              className={labelClass}
+            >
               Kepemilikan Gudang <span className="text-red-600">*</span>
             </label>
-            <select
-              id={`warehouse-${index}-ownership`}
-              aria-invalid={Boolean(warehouseErrors?.kepemilikan)}
-              className={`${inputClass} ${warehouseErrors?.kepemilikan ? 'border-red-500' : ''}`}
-              {...ownershipRegistration}
-              onChange={handleOwnershipChange}
-            >
-              <option value="">Pilih kepemilikan</option>
-              <option value="Milik Sendiri">Milik Sendiri</option>
-              <option value="Sewa">Sewa</option>
-            </select>
+            {ownershipLocked ? (
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                <div
+                  id={`warehouse-${index}-ownership`}
+                  role="textbox"
+                  aria-readonly="true"
+                  aria-labelledby={`warehouse-${index}-ownership-label`}
+                  className="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700"
+                >
+                  {ownership}
+                </div>
+                <button
+                  type="button"
+                  className="button-secondary shrink-0 self-start px-4 py-2 sm:self-auto"
+                  onClick={() => setOwnershipUnlocked(true)}
+                  aria-label={`Ubah Kepemilikan Gudang ${master.kodeGudang}`}
+                >
+                  Ubah
+                </button>
+              </div>
+            ) : (
+              <select
+                id={`warehouse-${index}-ownership`}
+                aria-invalid={Boolean(warehouseErrors?.kepemilikan)}
+                className={`${inputClass} ${warehouseErrors?.kepemilikan ? 'border-red-500' : ''}`}
+                {...ownershipRegistration}
+                onChange={handleOwnershipChange}
+              >
+                <option value="">Pilih kepemilikan</option>
+                <option value="Milik Sendiri">Milik Sendiri</option>
+                <option value="Sewa">Sewa</option>
+              </select>
+            )}
             <FieldError message={warehouseErrors?.kepemilikan?.message} />
           </div>
         )}
 
-        {status === 'Aktif' && ownership === 'Milik Sendiri' && (
+        {status === 'Aktif' &&
+          ownership === 'Milik Sendiri' &&
+          evidenceRequired && (
           <div
             className="min-w-0 max-w-full rounded-lg focus:outline-none focus:ring-3 focus:ring-red-100 sm:col-span-2"
             tabIndex={-1}
@@ -249,7 +331,7 @@ export function WarehouseCard({ index, form }: WarehouseCardProps) {
           </div>
         )}
 
-        {status === 'Aktif' && ownership === 'Sewa' && (
+        {status === 'Aktif' && ownership === 'Sewa' && evidenceRequired && (
           <>
             <div className="min-w-0 max-w-full">
               <label htmlFor={`warehouse-${index}-start`} className={labelClass}>
