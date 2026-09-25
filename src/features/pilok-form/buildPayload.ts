@@ -47,14 +47,6 @@ export async function buildSubmissionPayload(
   values: PilokFormValues,
   onUploaded: (update: UploadedDocumentUpdate) => void,
 ): Promise<PilokSubmissionRequest> {
-  if (values.adaPerubahan !== 'ya') {
-    return {
-      kodePilok: values.kodePilok,
-      adaPerubahan: false,
-      warehouses: [],
-    }
-  }
-
   const warehouses = await Promise.all(
     values.warehouses.map(
       async (warehouse, index): Promise<WarehouseSubmissionRequest> => {
@@ -121,7 +113,6 @@ export async function buildSubmissionPayload(
 
   return {
     kodePilok: values.kodePilok,
-    adaPerubahan: true,
     warehouses,
   }
 }

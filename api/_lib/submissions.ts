@@ -18,18 +18,13 @@ import {
 import { verifyDriveDocument } from './drive.js'
 import { getSubmissionSheetConfig } from './env.js'
 import { ApiError } from './errors.js'
-import {
-  appendRows,
-  deleteRows,
-  readSheetTable,
-  updateRowFields,
-} from './sheets.js'
+import type { SheetRow } from './sheets.js'
+import { appendRows, readSheetTable, updateRowFields } from './sheets.js'
 
 export const SUBMISSION_HEADERS = [
   'kode_pilok',
   'nama_distributor',
   'area_name',
-  'ada_perubahan',
   'created_at',
   'updated_at',
 ] as const
@@ -53,28 +48,6 @@ export const SUBMISSION_WAREHOUSE_HEADERS = [
   'bukti_sewa_url',
   'updated_at',
 ] as const
-
-export async function hasExistingSubmission(
-  kodePilok: string,
-): Promise<boolean> {
-  const config = getSubmissionSheetConfig()
-  const table = await readSheetTable(
-    config.spreadsheetId,
-    config.submissionSheetName,
-    SUBMISSION_HEADERS,
-  )
-  const matches = table.rows.filter(
-    (row) => row.record.kode_pilok === kodePilok,
-  )
-  if (matches.length > 1) {
-    throw new ApiError(
-      500,
-      'SUBMISSION_INVALID',
-      'Ditemukan lebih dari satu submission aktif untuk Kode PILOK ini.',
-    )
-  }
-  return matches.length === 1
-}
 
 function readDocumentId(
   row: Readonly<Record<string, string>>,
@@ -107,17 +80,24 @@ function readStoredCapacity(value: string, code: string): number {
 
 export async function getExistingSubmission(
   pilok: Pilok,
+  currentWarehouseCodes: ReadonlySet<string>,
 ): Promise<ExistingSubmission | null> {
   const config = getSubmissionSheetConfig()
-  const submissionTable = await readSheetTable(
-    config.spreadsheetId,
-    config.submissionSheetName,
-    SUBMISSION_HEADERS,
-  )
+  const [submissionTable, warehouseTable] = await Promise.all([
+    readSheetTable(
+      config.spreadsheetId,
+      config.submissionSheetName,
+      SUBMISSION_HEADERS,
+    ),
+    readSheetTable(
+      config.spreadsheetId,
+      config.warehouseSheetName,
+      SUBMISSION_WAREHOUSE_HEADERS,
+    ),
+  ])
   const matches = submissionTable.rows.filter(
     (row) => row.record.kode_pilok === pilok.kodePilok,
   )
-  if (matches.length === 0) return null
   if (matches.length > 1) {
     throw new ApiError(
       500,
@@ -125,16 +105,32 @@ export async function getExistingSubmission(
       'Ditemukan lebih dari satu submission aktif untuk Kode PILOK ini.',
     )
   }
-
-  const submissionRow = matches[0]
-  if (!submissionRow) return null
-  const answer = submissionRow.record.ada_perubahan
-  if (answer !== 'Ya' && answer !== 'Tidak') {
+  const storedWarehouseRows = warehouseTable.rows.filter(
+    (row) => row.record.kode_pilok === pilok.kodePilok,
+  )
+  const storedCodes = storedWarehouseRows.map(
+    (row) => row.record.kode_gudang ?? '',
+  )
+  if (
+    storedCodes.some((code) => !code) ||
+    new Set(storedCodes).size !== storedCodes.length
+  ) {
     throw new ApiError(
-      500,
-      'SUBMISSION_INVALID',
-      'Nilai ada_perubahan pada submission tersimpan tidak valid.',
+      409,
+      'SUBMISSION_DATA_CONFLICT',
+      'Submission gudang tersimpan memiliki key komposit kosong atau duplikat.',
     )
+  }
+  const submissionRow = matches[0]
+  if (!submissionRow) {
+    if (storedWarehouseRows.length > 0) {
+      throw new ApiError(
+        409,
+        'SUBMISSION_DATA_CONFLICT',
+        'Submission gudang tersimpan tidak memiliki parent submission.',
+      )
+    }
+    return null
   }
   const createdAt = submissionRow.record.created_at ?? ''
   const updatedAt = submissionRow.record.updated_at ?? ''
@@ -150,27 +146,11 @@ export async function getExistingSubmission(
       'Timestamp pada submission tersimpan tidak valid.',
     )
   }
-
-  const warehouseTable = await readSheetTable(
-    config.spreadsheetId,
-    config.warehouseSheetName,
-    SUBMISSION_WAREHOUSE_HEADERS,
+  const currentWarehouseRows = storedWarehouseRows.filter((row) =>
+    currentWarehouseCodes.has(row.record.kode_gudang ?? ''),
   )
-  const storedWarehouseRows = warehouseTable.rows.filter(
-    (row) => row.record.kode_pilok === pilok.kodePilok,
-  )
-  const storedCodes = storedWarehouseRows.map(
-    (row) => row.record.kode_gudang ?? '',
-  )
-  if (new Set(storedCodes).size !== storedCodes.length) {
-    throw new ApiError(
-      500,
-      'SUBMISSION_INVALID',
-      'Submission tersimpan memiliki Kode Gudang duplikat.',
-    )
-  }
   const warehouses = await Promise.all(
-    storedWarehouseRows.map(async (row): Promise<ExistingWarehouse> => {
+    currentWarehouseRows.map(async (row): Promise<ExistingWarehouse> => {
       const status = row.record.status_gudang
       if (status !== '' && status !== 'Aktif' && status !== 'Tidak Aktif') {
         throw new ApiError(
@@ -244,7 +224,6 @@ export async function getExistingSubmission(
 
   return {
     ...pilok,
-    adaPerubahan: answer === 'Ya',
     createdAt,
     updatedAt,
     warehouses,
@@ -313,6 +292,70 @@ export function resolveSubmissionTimestamps(
   return { createdAt: storedCreatedAt, updatedAt }
 }
 
+interface WarehouseRowUpdate {
+  rowNumber: number
+  record: Readonly<Record<string, string>>
+}
+
+export interface WarehouseUpsertPlan {
+  updates: WarehouseRowUpdate[]
+  inserts: Readonly<Record<string, string>>[]
+}
+
+export function planWarehouseUpserts(
+  kodePilok: string,
+  storedRows: readonly SheetRow[],
+  records: readonly Readonly<Record<string, string>>[],
+): WarehouseUpsertPlan {
+  const existingByCode = new Map<string, SheetRow>()
+  for (const row of storedRows) {
+    if (row.record.kode_pilok !== kodePilok) continue
+    const kodeGudang = row.record.kode_gudang ?? ''
+    if (!kodeGudang) {
+      throw new ApiError(
+        409,
+        'SUBMISSION_DATA_CONFLICT',
+        `Submission gudang untuk Kode PILOK ${kodePilok} memiliki Kode Gudang kosong.`,
+      )
+    }
+    if (existingByCode.has(kodeGudang)) {
+      throw new ApiError(
+        409,
+        'SUBMISSION_DATA_CONFLICT',
+        `Ditemukan duplikat submission_gudang untuk Kode PILOK ${kodePilok} dan Kode Gudang ${kodeGudang}.`,
+      )
+    }
+    existingByCode.set(kodeGudang, row)
+  }
+
+  const incomingCodes = new Set<string>()
+  const updates: WarehouseRowUpdate[] = []
+  const inserts: Readonly<Record<string, string>>[] = []
+  for (const record of records) {
+    const kodeGudang = record.kode_gudang ?? ''
+    if (
+      record.kode_pilok !== kodePilok ||
+      !kodeGudang ||
+      incomingCodes.has(kodeGudang)
+    ) {
+      throw new ApiError(
+        400,
+        'SUBMISSION_INVALID',
+        'Daftar gudang submission tidak memiliki key komposit yang unik dan valid.',
+      )
+    }
+    incomingCodes.add(kodeGudang)
+    const existing = existingByCode.get(kodeGudang)
+    if (existing) {
+      updates.push({ rowNumber: existing.rowNumber, record })
+    } else {
+      inserts.push(record)
+    }
+  }
+
+  return { updates, inserts }
+}
+
 export async function upsertSubmission(
   pilok: Pilok,
   request: PilokSubmissionRequest,
@@ -341,62 +384,55 @@ export async function upsertSubmission(
       'Ditemukan lebih dari satu submission aktif untuk Kode PILOK ini.',
     )
   }
-  if (!request.adaPerubahan && existingRows.length === 0) {
-    throw new ApiError(
-      400,
-      'SUBMISSION_INVALID',
-      'Pilihan Tidak hanya tersedia jika data sebelumnya sudah ada.',
-    )
-  }
-
   const storedCreatedAt = existingRows[0]
     ? existingRows[0].record.created_at ?? ''
     : null
   const { createdAt, updatedAt } = resolveSubmissionTimestamps(storedCreatedAt)
-  const warehouses = request.adaPerubahan
-    ? request.warehouses.map((warehouse): WarehouseSubmission => {
-        const master = warehouseMasters.get(warehouse.kodeGudang)
-        if (!master) {
-          throw new ApiError(
-            404,
-            'WAREHOUSE_NOT_FOUND',
-            'Kode Gudang tidak ditemukan pada hasil validasi master.',
-          )
-        }
-        return {
-          ...warehouse,
-          namaGudang: master.namaGudang,
-          kapasitasGudang: master.kapasitasGudang,
-        }
-      })
-    : []
-
-  const oldWarehouseRows = warehouseTable.rows.filter(
-    (row) => row.record.kode_pilok === pilok.kodePilok,
+  const warehouses = request.warehouses.map(
+    (warehouse): WarehouseSubmission => {
+      const master = warehouseMasters.get(warehouse.kodeGudang)
+      if (!master) {
+        throw new ApiError(
+          404,
+          'WAREHOUSE_NOT_FOUND',
+          'Kode Gudang tidak ditemukan pada hasil validasi master.',
+        )
+      }
+      return {
+        ...warehouse,
+        namaGudang: master.namaGudang,
+        kapasitasGudang: master.kapasitasGudang,
+      }
+    },
   )
-  if (request.adaPerubahan) {
-    if (warehouses.length > 0) {
-      await appendRows(
-        config.spreadsheetId,
-        config.warehouseSheetName,
-        warehouseTable.headers,
-        warehouses.map((warehouse) =>
-          warehouseRecord(pilok, warehouse, updatedAt),
-        ),
-      )
-    }
-    await deleteRows(
+
+  const warehousePlan = planWarehouseUpserts(
+    pilok.kodePilok,
+    warehouseTable.rows,
+    warehouses.map((warehouse) =>
+      warehouseRecord(pilok, warehouse, updatedAt),
+    ),
+  )
+  for (const update of warehousePlan.updates) {
+    await updateRowFields(
       config.spreadsheetId,
       config.warehouseSheetName,
-      oldWarehouseRows.map((row) => row.rowNumber),
+      warehouseTable.headers,
+      update.rowNumber,
+      update.record,
     )
   }
+  await appendRows(
+    config.spreadsheetId,
+    config.warehouseSheetName,
+    warehouseTable.headers,
+    warehousePlan.inserts,
+  )
 
   const parentRecord = {
     kode_pilok: pilok.kodePilok,
     nama_distributor: pilok.namaDistributor,
     area_name: pilok.areaName,
-    ada_perubahan: request.adaPerubahan ? 'Ya' : 'Tidak',
     created_at: createdAt,
     updated_at: updatedAt,
   }
@@ -420,7 +456,6 @@ export async function upsertSubmission(
 
   return {
     ...pilok,
-    adaPerubahan: request.adaPerubahan,
     createdAt,
     updatedAt,
     warehouses,

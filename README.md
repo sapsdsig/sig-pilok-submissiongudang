@@ -63,9 +63,10 @@ When the form opens:
 3. Existing persisted survey values are merged by `(kode_pilok, kode_gudang)`.
 4. Master names and capacities always come from current master data.
 
-`Apakah Ada Perubahan` always defaults to **Ya**. **Tidak** is disabled for a first-time PILOK. For an existing submission, **Tidak** updates only parent metadata and preserves persisted warehouse rows exactly. **Ya** must submit the full current mastered set and replaces the active warehouse state after strict validation.
+Every submission must contain the full current mastered warehouse set. Existing survey state is prefilled by `(kode_pilok, kode_gudang)`, while newly mastered warehouses start blank and require completion.
 
 Each `submission_gudang` row stores a snapshot of PILOK/distributor/area and warehouse code/name/capacity alongside its validated survey fields.
+Current master warehouses are updated or inserted by composite key. Stored rows for warehouses no longer present in `gudang_master` remain untouched and are not displayed or validated.
 
 ## UI system
 

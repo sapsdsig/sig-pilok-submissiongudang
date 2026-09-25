@@ -4,7 +4,10 @@ import {
   sendApiError,
 } from './_lib/errors.js'
 import type { ApiRequest, ApiResponse } from './_lib/http.js'
-import { getPilokByCode } from './_lib/masterData.js'
+import {
+  getPilokByCode,
+  getWarehousesByPilok,
+} from './_lib/masterData.js'
 import { getExistingSubmission, upsertSubmission } from './_lib/submissions.js'
 import { validateAndNormalizeSubmission } from './_lib/submissionValidation.js'
 
@@ -22,7 +25,13 @@ export default async function handler(
     if (request.method === 'GET') {
       const code = requireQueryCode(request.query.pilok, 'Kode PILOK')
       const pilok = await getPilokByCode(code)
-      const submission = await getExistingSubmission(pilok)
+      const currentWarehouses = await getWarehousesByPilok(pilok.kodePilok)
+      const submission = await getExistingSubmission(
+        pilok,
+        new Set(
+          currentWarehouses.map((warehouse) => warehouse.kodeGudang),
+        ),
+      )
       return response.status(200).json(
         submission
           ? { found: true, submission }

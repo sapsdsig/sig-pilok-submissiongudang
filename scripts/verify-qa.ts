@@ -7,9 +7,20 @@ import {
   getWibTimestamp,
   isSupportedStoredTimestamp,
 } from '../api/_lib/dateTime.js'
-import { submissionWarehouseSchema } from '../api/_lib/submissionValidation.js'
 import {
+  submissionEnvelopeSchema,
+  submissionWarehouseSchema,
+  validateWarehouseMembership,
+} from '../api/_lib/submissionValidation.js'
+import {
+  PILOK_HEADERS,
+  WAREHOUSE_HEADERS,
+} from '../api/_lib/masterData.js'
+import {
+  planWarehouseUpserts,
   resolveSubmissionTimestamps,
+  SUBMISSION_HEADERS,
+  SUBMISSION_WAREHOUSE_HEADERS,
   warehouseRecord,
 } from '../api/_lib/submissions.js'
 import { buildSubmissionPayload } from '../src/features/pilok-form/buildPayload.js'
@@ -17,6 +28,7 @@ import type {
   PilokFormValues,
   WarehouseFormValues,
 } from '../src/features/pilok-form/formTypes.js'
+import { mergeWarehouseFormValues } from '../src/features/pilok-form/mergeWarehouseState.js'
 import { createPilokFormSchema } from '../src/features/pilok-form/schema.js'
 import { uploadService } from '../src/services/uploadService.js'
 import type { ExistingSubmission } from '../src/types/domain.js'
@@ -33,7 +45,45 @@ const { PilokMainForm } = await import(
   '../src/features/pilok-form/PilokMainForm.js'
 )
 
-const schema = createPilokFormSchema(false)
+const schema = createPilokFormSchema()
+
+assert.deepEqual(PILOK_HEADERS, [
+  'kode_pilok',
+  'nama_distributor',
+  'area_name',
+])
+assert.deepEqual(WAREHOUSE_HEADERS, [
+  'kode_pilok',
+  'kode_gudang',
+  'nama_gudang',
+  'kapasitas_gudang',
+])
+assert.deepEqual(SUBMISSION_HEADERS, [
+  'kode_pilok',
+  'nama_distributor',
+  'area_name',
+  'created_at',
+  'updated_at',
+])
+assert.deepEqual(SUBMISSION_WAREHOUSE_HEADERS, [
+  'kode_pilok',
+  'nama_distributor',
+  'area_name',
+  'kode_gudang',
+  'nama_gudang',
+  'kapasitas_gudang',
+  'status_gudang',
+  'kepemilikan',
+  'mulai_sewa',
+  'berakhir_sewa',
+  'shm_file_id',
+  'shm_file_name',
+  'shm_url',
+  'bukti_sewa_file_id',
+  'bukti_sewa_file_name',
+  'bukti_sewa_url',
+  'updated_at',
+])
 
 for (const value of ['2026-05-01', '2026-12-31', '2028-02-29']) {
   assert.notEqual(parseNativeDate(value), null, `${value} harus valid.`)
@@ -105,9 +155,53 @@ const valuesWith = (warehouse: WarehouseFormValues): PilokFormValues => ({
   kodePilok: '10001',
   namaDistributor: 'Distributor QA',
   areaName: 'Area QA',
-  adaPerubahan: 'ya',
   warehouses: [warehouse],
 })
+
+assert.equal(
+  submissionEnvelopeSchema.safeParse({
+    kodePilok: '10001',
+    warehouses: [],
+  }).success,
+  true,
+  'Envelope submission tidak memerlukan ada_perubahan.',
+)
+assert.equal(
+  submissionEnvelopeSchema.safeParse({
+    kodePilok: '10001',
+    adaPerubahan: true,
+    warehouses: [],
+  }).success,
+  false,
+  'Envelope submission menolak field ada_perubahan yang sudah usang.',
+)
+
+const membershipMasters = [
+  {
+    kodePilok: '10001',
+    kodeGudang: 'A',
+    namaGudang: 'Gudang A',
+    kapasitasGudang: 100,
+  },
+  {
+    kodePilok: '10001',
+    kodeGudang: 'B',
+    namaGudang: 'Gudang B',
+    kapasitasGudang: 200,
+  },
+]
+assert.equal(
+  validateWarehouseMembership(['A', 'B'], membershipMasters).size,
+  2,
+)
+assert.throws(
+  () => validateWarehouseMembership(['A'], membershipMasters),
+  /Daftar gudang harus sama/,
+)
+assert.throws(
+  () => validateWarehouseMembership(['A', 'B', 'X'], membershipMasters),
+  /Daftar gudang harus sama/,
+)
 
 const validationMessages = (values: PilokFormValues) => {
   const result = schema.safeParse(values)
@@ -425,6 +519,7 @@ assert.deepEqual(persistedRentalPayload.warehouses, [
     buktiSewa: existingDocument,
   },
 ])
+assert.equal('adaPerubahan' in persistedRentalPayload, false)
 const persistedWarehouseRecord = warehouseRecord(
   {
     kodePilok: '10001',
@@ -446,6 +541,83 @@ const persistedWarehouseRecord = warehouseRecord(
 assert.equal(persistedWarehouseRecord.mulai_sewa, '21-09-2026')
 assert.equal(persistedWarehouseRecord.berakhir_sewa, '21-09-2027')
 assert.equal(persistedWarehouseRecord.updated_at, '21-09-2026 10:14:32')
+const inactiveWarehouseRecord = warehouseRecord(
+  {
+    kodePilok: '10001',
+    namaDistributor: 'Distributor QA',
+    areaName: 'Area QA',
+  },
+  {
+    kodeGudang: 'G001',
+    namaGudang: 'Gudang QA',
+    kapasitasGudang: 100,
+    status: 'Tidak Aktif',
+    kepemilikan: '',
+  },
+  '21-09-2026 10:14:32',
+)
+for (const header of [
+  'kepemilikan',
+  'mulai_sewa',
+  'berakhir_sewa',
+  'shm_file_id',
+  'shm_file_name',
+  'shm_url',
+  'bukti_sewa_file_id',
+  'bukti_sewa_file_name',
+  'bukti_sewa_url',
+]) {
+  assert.equal(inactiveWarehouseRecord[header], '')
+}
+
+const storedWarehouseRows = [
+  {
+    rowNumber: 2,
+    values: [],
+    record: { kode_pilok: '10001', kode_gudang: 'A' },
+  },
+  {
+    rowNumber: 3,
+    values: [],
+    record: { kode_pilok: '10001', kode_gudang: 'B' },
+  },
+  {
+    rowNumber: 4,
+    values: [],
+    record: { kode_pilok: '10001', kode_gudang: 'OLD' },
+  },
+]
+const warehouseUpsertPlan = planWarehouseUpserts(
+  '10001',
+  storedWarehouseRows,
+  [
+    { kode_pilok: '10001', kode_gudang: 'A', status_gudang: 'Aktif' },
+    { kode_pilok: '10001', kode_gudang: 'B', status_gudang: 'Tidak Aktif' },
+    { kode_pilok: '10001', kode_gudang: 'C', status_gudang: 'Aktif' },
+  ],
+)
+assert.deepEqual(
+  warehouseUpsertPlan.updates.map((update) => update.rowNumber),
+  [2, 3],
+)
+assert.deepEqual(
+  warehouseUpsertPlan.inserts.map((record) => record.kode_gudang),
+  ['C'],
+)
+assert.equal(
+  warehouseUpsertPlan.updates.some((update) => update.rowNumber === 4),
+  false,
+  'Gudang OLD yang tidak lagi ada di master harus tetap tidak disentuh.',
+)
+assert.throws(
+  () =>
+    planWarehouseUpserts(
+      '10001',
+      [...storedWarehouseRows, { ...storedWarehouseRows[0]!, rowNumber: 5 }],
+      [],
+    ),
+  /duplikat submission_gudang/,
+)
 
 let uploadCount = 0
 uploadService.uploadDocument = async () => {
@@ -490,11 +662,164 @@ try {
   uploadService.uploadDocument = originalUploadDocument
 }
 
+const mergeMasters = [
+  ...membershipMasters,
+  {
+    kodePilok: '10001',
+    kodeGudang: 'C',
+    namaGudang: 'Gudang C',
+    kapasitasGudang: 300,
+  },
+]
+const existingCurrentState: ExistingSubmission = {
+  kodePilok: '10001',
+  namaDistributor: 'Distributor QA',
+  areaName: 'Area QA',
+  createdAt: '21-09-2026 10:14:32',
+  updatedAt: '22-09-2026 10:14:32',
+  warehouses: [
+    {
+      kodeGudang: 'A',
+      namaGudang: 'Nama snapshot lama A',
+      kapasitasGudang: 1,
+      status: 'Aktif',
+      kepemilikan: 'Sewa',
+      mulaiSewa: '2026-01-01',
+      berakhirSewa: '2026-12-31',
+      buktiSewa: existingDocument,
+      updatedAt: '21-09-2026 10:14:32',
+    },
+    {
+      kodeGudang: 'B',
+      namaGudang: 'Nama snapshot lama B',
+      kapasitasGudang: 2,
+      status: 'Aktif',
+      kepemilikan: 'Milik Sendiri',
+      shm: existingDocument,
+      updatedAt: '21-09-2026 10:14:32',
+    },
+    {
+      kodeGudang: 'OLD',
+      namaGudang: 'Gudang Lama',
+      kapasitasGudang: 50,
+      status: 'Tidak Aktif',
+      kepemilikan: '',
+      updatedAt: '21-09-2026 10:14:32',
+    },
+  ],
+}
+const mergedWarehouses = mergeWarehouseFormValues(
+  mergeMasters,
+  existingCurrentState,
+)
+assert.deepEqual(
+  mergedWarehouses.map((warehouse) => warehouse.kodeGudang),
+  ['A', 'B', 'C'],
+  'UI hanya boleh mengikuti gudang_master terkini.',
+)
+assert.deepEqual(
+  {
+    namaGudang: mergedWarehouses[0]?.namaGudang,
+    kapasitasGudang: mergedWarehouses[0]?.kapasitasGudang,
+    status: mergedWarehouses[0]?.status,
+    kepemilikan: mergedWarehouses[0]?.kepemilikan,
+    buktiSewa: mergedWarehouses[0]?.existingBuktiSewa,
+  },
+  {
+    namaGudang: 'Gudang A',
+    kapasitasGudang: 100,
+    status: 'Aktif',
+    kepemilikan: 'Sewa',
+    buktiSewa: existingDocument,
+  },
+)
+assert.equal(mergedWarehouses[1]?.existingShm, existingDocument)
+assert.deepEqual(
+  {
+    status: mergedWarehouses[2]?.status,
+    kepemilikan: mergedWarehouses[2]?.kepemilikan,
+  },
+  { status: '', kepemilikan: '' },
+  'Gudang master baru harus tampil dengan state survei kosong.',
+)
+assert.deepEqual(
+  validationMessages({
+    kodePilok: '10001',
+    namaDistributor: 'Distributor QA',
+    areaName: 'Area QA',
+    warehouses: mergedWarehouses,
+  }),
+  ['Status Gudang wajib dipilih.'],
+)
+assert.equal(
+  schema.safeParse({
+    kodePilok: '10001',
+    namaDistributor: 'Distributor QA',
+    areaName: 'Area QA',
+    warehouses: mergedWarehouses.slice(0, 2),
+  }).success,
+  true,
+  'Dokumen existing yang valid harus dapat digunakan kembali.',
+)
+
+const incompleteRental = mergeWarehouseFormValues(
+  [membershipMasters[0]!],
+  {
+    ...existingCurrentState,
+    warehouses: [
+      {
+        kodeGudang: 'A',
+        namaGudang: 'Nama snapshot lama A',
+        status: 'Aktif',
+        kepemilikan: 'Sewa',
+        updatedAt: '21-09-2026 10:14:32',
+      },
+    ],
+  },
+)
+assert.deepEqual(
+  validationMessages({
+    kodePilok: '10001',
+    namaDistributor: 'Distributor QA',
+    areaName: 'Area QA',
+    warehouses: incompleteRental,
+  }),
+  [
+    'Tanggal mulai sewa wajib diisi.',
+    'Tanggal berakhir sewa wajib diisi.',
+    'Bukti sewa wajib diunggah.',
+  ],
+)
+
+const incompleteOwnership = mergeWarehouseFormValues(
+  [membershipMasters[0]!],
+  {
+    ...existingCurrentState,
+    warehouses: [
+      {
+        kodeGudang: 'A',
+        namaGudang: 'Nama snapshot lama A',
+        status: 'Aktif',
+        kepemilikan: '',
+        updatedAt: '21-09-2026 10:14:32',
+      },
+    ],
+  },
+)
+assert.deepEqual(
+  validationMessages({
+    kodePilok: '10001',
+    namaDistributor: 'Distributor QA',
+    areaName: 'Area QA',
+    warehouses: incompleteOwnership,
+  }),
+  ['Kepemilikan Gudang wajib dipilih.'],
+)
+
 const existingInactive: ExistingSubmission = {
   kodePilok: '10001',
   namaDistributor: 'Distributor QA',
   areaName: 'Area QA',
-  adaPerubahan: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   warehouses: [
@@ -534,6 +859,13 @@ assert.equal(
   'Error validasi tidak boleh tampil pada render awal.',
 )
 assert.equal(initialMarkup.includes('Masih ada data wajib'), false)
+assert.equal(initialMarkup.includes('Apakah Ada Perubahan'), false)
+assert.equal(
+  initialMarkup.includes(
+    'Data yang ditampilkan pada menu ini merupakan data pada database MDXL dan telah digunakan di Evaluasi HY 2026',
+  ),
+  true,
+)
 assert.equal(
   initialMarkup.includes('Kepemilikan Gudang'),
   false,

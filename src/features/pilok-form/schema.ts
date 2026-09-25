@@ -42,7 +42,6 @@ const basePilokFormSchema = z.object({
   kodePilok: z.string(),
   namaDistributor: z.string(),
   areaName: z.string(),
-  adaPerubahan: z.union([z.literal('ya'), z.literal('tidak')]),
   warehouses: z.array(warehouseSchema),
 })
 
@@ -89,19 +88,8 @@ const validatePdf = (
   }
 }
 
-export const createPilokFormSchema = (hasExistingSubmission: boolean) =>
+export const createPilokFormSchema = () =>
   basePilokFormSchema.superRefine((values, context) => {
-    if (values.adaPerubahan === 'tidak') {
-      if (!hasExistingSubmission) {
-        context.addIssue({
-          code: 'custom',
-          path: ['adaPerubahan'],
-          message: 'Pilihan Tidak hanya tersedia jika data sebelumnya ada.',
-        })
-      }
-      return
-    }
-
     if (values.warehouses.length === 0) {
       context.addIssue({
         code: 'custom',

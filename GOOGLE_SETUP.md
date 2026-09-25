@@ -14,6 +14,8 @@ Store the client ID, client secret, and refresh token only in server environment
 ## 2. Spreadsheet tabs and headers
 
 The three spreadsheet IDs may reference the same workbook or different workbooks. Format identifier columns as **Plain text**.
+Header names and order must match the definitions below exactly; the read-only
+verification rejects missing, extra, or reordered columns.
 
 ### `pilok_master` — read only
 
@@ -32,7 +34,7 @@ PILOK directly masters warehouses through `kode_pilok`. The logical relationship
 ### `submission` — application read/write
 
 ```text
-kode_pilok | nama_distributor | area_name | ada_perubahan | created_at | updated_at
+kode_pilok | nama_distributor | area_name | created_at | updated_at
 ```
 
 ### `submission_gudang` — application read/write
@@ -41,7 +43,7 @@ kode_pilok | nama_distributor | area_name | ada_perubahan | created_at | updated
 kode_pilok | nama_distributor | area_name | kode_gudang | nama_gudang | kapasitas_gudang | status_gudang | kepemilikan | mulai_sewa | berakhir_sewa | shm_file_id | shm_file_name | shm_url | bukti_sewa_file_id | bukti_sewa_file_name | bukti_sewa_url | updated_at
 ```
 
-Every **Ya** write snapshots PILOK/distributor/area and warehouse code/name/capacity from current master data. The client cannot supply authoritative master values.
+Every write snapshots PILOK/distributor/area and warehouse code/name/capacity from current master data. The client cannot supply authoritative master values.
 
 ## 3. Drive folders
 
@@ -96,10 +98,9 @@ In Vercel, add every `.env.example` variable to each required environment. Do no
 
 - One parent submission exists per `kode_pilok`.
 - The first write sets both timestamps; updates preserve `created_at` and replace `updated_at` with a server timestamp.
-- A first-time PILOK cannot submit **Tidak**.
-- Existing + **Tidak** updates the parent row and leaves `submission_gudang` untouched, even if current master data changed.
-- **Ya** requires the submitted warehouse set to exactly equal the current `gudang_master` rows scoped to that PILOK, then replaces active warehouse rows.
-- Existing persisted rows removed from current master remain readable, but are omitted by the next **Ya** replacement.
+- Every submission requires the submitted warehouse set to exactly equal the current `gudang_master` rows scoped to that PILOK.
+- Current-master warehouse rows are updated or appended by `(kode_pilok, kode_gudang)`.
+- Existing persisted rows removed from current master remain stored and untouched.
 - Replaced Drive files are not automatically deleted.
 
 ## Resumable upload

@@ -1,6 +1,5 @@
 import type { DriveDocumentReference } from '../../types/domain'
 
-export type ChangeAnswer = 'ya' | 'tidak'
 export type WarehouseStatusInput = '' | 'Aktif' | 'Tidak Aktif'
 export type WarehouseOwnershipInput = '' | 'Milik Sendiri' | 'Sewa'
 
@@ -22,6 +21,5 @@ export interface PilokFormValues {
   kodePilok: string
   namaDistributor: string
   areaName: string
-  adaPerubahan: ChangeAnswer
   warehouses: WarehouseFormValues[]
 }

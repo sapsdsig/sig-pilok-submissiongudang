@@ -159,51 +159,22 @@ export async function updateRowFields(
   })
 }
 
-export async function deleteRows(
-  spreadsheetId: string,
-  sheetName: string,
-  rowNumbers: readonly number[],
-) {
-  if (rowNumbers.length === 0) return
-
-  const spreadsheet = await sheetsApi().spreadsheets.get({
-    spreadsheetId,
-    fields: 'sheets.properties(sheetId,title)',
-  })
-  const sheet = spreadsheet.data.sheets?.find(
-    (candidate) => candidate.properties?.title === sheetName,
-  )
-  const sheetId = sheet?.properties?.sheetId
-  if (sheetId === undefined || sheetId === null) {
-    throw new ApiError(
-      500,
-      'GOOGLE_CONFIG_ERROR',
-      `Sheet ${sheetName} tidak ditemukan.`,
-    )
-  }
-
-  const sorted = [...new Set(rowNumbers)].sort((left, right) => right - left)
-  await sheetsApi().spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: {
-      requests: sorted.map((rowNumber) => ({
-        deleteDimension: {
-          range: {
-            sheetId,
-            dimension: 'ROWS',
-            startIndex: rowNumber - 1,
-            endIndex: rowNumber,
-          },
-        },
-      })),
-    },
-  })
-}
-
 export async function verifySheetAccess(
   spreadsheetId: string,
   sheetName: string,
   headers: readonly string[],
+  exactHeaders = false,
 ) {
-  await readSheetTable(spreadsheetId, sheetName, headers)
+  const table = await readSheetTable(spreadsheetId, sheetName, headers)
+  if (
+    exactHeaders &&
+    (table.headers.length !== headers.length ||
+      table.headers.some((header, index) => header !== headers[index]))
+  ) {
+    throw new ApiError(
+      500,
+      'GOOGLE_CONFIG_ERROR',
+      `Sheet ${sheetName} harus memiliki header persis: ${headers.join(', ')}.`,
+    )
+  }
 }

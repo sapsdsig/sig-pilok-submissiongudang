@@ -54,7 +54,6 @@ export interface PilokSubmission {
   kodePilok: string
   namaDistributor: string
   areaName: string
-  adaPerubahan: boolean
   createdAt: string
   updatedAt: string
   warehouses: WarehouseSubmission[]
@@ -77,7 +76,6 @@ export interface ExistingSubmission {
   kodePilok: string
   namaDistributor: string
   areaName: string
-  adaPerubahan: boolean
   createdAt: string
   updatedAt: string
   warehouses: ExistingWarehouse[]
@@ -112,6 +110,5 @@ export type WarehouseSubmissionRequest =
 
 export interface PilokSubmissionRequest {
   kodePilok: string
-  adaPerubahan: boolean
   warehouses: WarehouseSubmissionRequest[]
 }

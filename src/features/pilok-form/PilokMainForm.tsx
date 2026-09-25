@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMemo, useState } from 'react'
-import { useFieldArray, useForm, useWatch } from 'react-hook-form'
+import { useFieldArray, useForm } from 'react-hook-form'
 import { FieldError } from '../../components/FieldError'
 import {
   ActionBar,
@@ -18,6 +18,7 @@ import type {
 } from '../../types/domain'
 import { buildSubmissionPayload } from './buildPayload'
 import type { PilokFormValues } from './formTypes'
+import { mergeWarehouseFormValues } from './mergeWarehouseState'
 import { createPilokFormSchema } from './schema'
 import { WarehouseCard } from './WarehouseCard'
 
@@ -36,41 +37,16 @@ export function PilokMainForm({
   onBack,
   onSuccess,
 }: PilokMainFormProps) {
-  const existingByCode = useMemo(
-    () =>
-      new Map(
-        existingSubmission?.warehouses.map((warehouse) => [
-          warehouse.kodeGudang,
-          warehouse,
-        ]) ?? [],
-      ),
-    [existingSubmission],
-  )
-  const schema = useMemo(
-    () => createPilokFormSchema(existingSubmission !== null),
-    [existingSubmission],
-  )
+  const schema = useMemo(() => createPilokFormSchema(), [])
   const form = useForm<PilokFormValues>({
     resolver: zodResolver(schema),
     shouldUnregister: false,
     defaultValues: {
       ...pilok,
-      adaPerubahan: 'ya',
-      warehouses: masterWarehouses.map((master) => {
-        const existing = existingByCode.get(master.kodeGudang)
-        const isInactive = existing?.status === 'Tidak Aktif'
-        return {
-          kodeGudang: master.kodeGudang,
-          namaGudang: master.namaGudang,
-          kapasitasGudang: master.kapasitasGudang,
-          status: existing?.status ?? '',
-          kepemilikan: isInactive ? '' : (existing?.kepemilikan ?? ''),
-          mulaiSewa: isInactive ? undefined : existing?.mulaiSewa,
-          berakhirSewa: isInactive ? undefined : existing?.berakhirSewa,
-          existingShm: isInactive ? undefined : existing?.shm,
-          existingBuktiSewa: isInactive ? undefined : existing?.buktiSewa,
-        }
-      }),
+      warehouses: mergeWarehouseFormValues(
+        masterWarehouses,
+        existingSubmission,
+      ),
     },
     mode: 'onChange',
     reValidateMode: 'onChange',
@@ -80,7 +56,6 @@ export function PilokMainForm({
     register,
     control,
     handleSubmit,
-    clearErrors,
     setError,
     setValue,
     formState: { errors, isSubmitting },
@@ -93,18 +68,13 @@ export function PilokMainForm({
     'idle' | 'uploading' | 'saving'
   >('idle')
 
-  const selectChangeAnswer = (answer: 'ya' | 'tidak') => {
-    if (answer === 'tidak') clearErrors('warehouses')
-  }
-
   const submitForm = async (values: PilokFormValues) => {
     try {
-      const hasNewFiles =
-        values.adaPerubahan === 'ya' &&
-        values.warehouses.some((warehouse) =>
+      const hasNewFiles = values.warehouses.some(
+        (warehouse) =>
           warehouse.status === 'Aktif' &&
           Boolean(warehouse.shm || warehouse.buktiSewa),
-        )
+      )
       setProcessingState(hasNewFiles ? 'uploading' : 'saving')
       const payload = await buildSubmissionPayload(values, (update) => {
         setValue(`warehouses.${update.index}.${update.field}`, update.reference)
@@ -141,8 +111,6 @@ export function PilokMainForm({
     })
   }
 
-  const adaPerubahan = useWatch({ control, name: 'adaPerubahan' })
-
   return (
     <form
       id="pilok-main-form"
@@ -175,90 +143,40 @@ export function PilokMainForm({
           <ReadonlyField label="Area Name" value={pilok.areaName} />
         </div>
 
-        {existingSubmission && (
-          <div className="mt-5">
-            <StatusBanner variant="info" compact>
-              Data sebelumnya ditemukan. Pilih &ldquo;Tidak&rdquo; jika data
-              gudang masih sama, atau &ldquo;Ya&rdquo; untuk melakukan
-              perubahan.
-            </StatusBanner>
-          </div>
-        )}
-
         <input type="hidden" {...register('kodePilok')} />
         <input type="hidden" {...register('namaDistributor')} />
         <input type="hidden" {...register('areaName')} />
-
-        <fieldset className="mt-7 min-w-0 max-w-full border-t border-slate-200 pt-6">
-          <legend className="text-sm font-semibold text-slate-900">
-            Apakah Ada Perubahan? <span className="text-red-600">*</span>
-          </legend>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {(['ya', 'tidak'] as const).map((answer) => (
-              <label
-                key={answer}
-                className={`flex min-w-28 cursor-pointer items-center gap-2.5 rounded-lg border px-4 py-3 text-sm font-medium transition ${
-                  adaPerubahan === answer
-                    ? 'border-sig-red bg-red-50 text-sig-ink ring-1 ring-sig-red'
-                    : answer === 'tidak' && !existingSubmission
-                      ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                      : 'border-slate-300 bg-white text-slate-700 hover:border-sig-red'
-                }`}
-              >
-                <input
-                  type="radio"
-                  value={answer}
-                  disabled={answer === 'tidak' && !existingSubmission}
-                  className="size-4 accent-sig-red"
-                  {...register('adaPerubahan', {
-                    onChange: () => selectChangeAnswer(answer),
-                  })}
-                />
-                {answer === 'ya' ? 'Ya' : 'Tidak'}
-              </label>
-            ))}
-          </div>
-          {!existingSubmission && (
-            <p className="mt-2 text-sm text-slate-500">
-              Pilihan &ldquo;Tidak&rdquo; tersedia setelah kode PILOK memiliki data
-              submission sebelumnya.
-            </p>
-          )}
-          <FieldError message={errors.adaPerubahan?.message} />
-        </fieldset>
       </SectionCard>
 
-      {adaPerubahan === 'ya' && (
-        <SectionCard>
-          <div className="mb-6">
-            <SectionHeader
-              step={2}
-              title="Data Gudang"
-              description="Lengkapi data survei untuk seluruh gudang. Daftar gudang yang ditampilkan secara otomatis mengacu pada data gudang yang terdaftar di MDXL."
-            />
-            <FieldError
-              message={
-                typeof errors.warehouses?.message === 'string'
-                  ? errors.warehouses.message
-                  : undefined
-              }
-            />
-          </div>
+      <SectionCard>
+        <div className="mb-6">
+          <SectionHeader
+            step={2}
+            title="Data Gudang"
+            description="Data yang ditampilkan pada menu ini merupakan data pada database MDXL dan telah digunakan di Evaluasi HY 2026"
+          />
+          <FieldError
+            message={
+              typeof errors.warehouses?.message === 'string'
+                ? errors.warehouses.message
+                : undefined
+            }
+          />
+        </div>
 
-          {fields.length === 0 ? (
-            <StatusBanner variant="error" title="Master gudang belum tersedia">
-              PILOK ini belum memiliki gudang pada gudang_master. Data perubahan
-              belum dapat dikirim.
-            </StatusBanner>
-          ) : (
-            <div className="w-full min-w-0 max-w-full space-y-5">
-              {fields.map((field, index) => (
-                <WarehouseCard key={field.id} index={index} form={form} />
-              ))}
-            </div>
-          )}
-        </SectionCard>
-      )}
+        {fields.length === 0 ? (
+          <StatusBanner variant="error" title="Master gudang belum tersedia">
+            PILOK ini belum memiliki gudang pada gudang_master. Data gudang
+            belum dapat dikirim.
+          </StatusBanner>
+        ) : (
+          <div className="w-full min-w-0 max-w-full space-y-5">
+            {fields.map((field, index) => (
+              <WarehouseCard key={field.id} index={index} form={form} />
+            ))}
+          </div>
+        )}
+      </SectionCard>
 
       {errors.root?.message && (
         <StatusBanner variant="error">{errors.root.message}</StatusBanner>
@@ -277,9 +195,7 @@ export function PilokMainForm({
       >
         <button
           type="submit"
-          disabled={
-            isSubmitting || (adaPerubahan === 'ya' && fields.length === 0)
-          }
+          disabled={isSubmitting || fields.length === 0}
           className="button-primary"
         >
           {isSubmitting ? (

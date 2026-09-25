@@ -24,7 +24,12 @@ async function verify() {
 
   const pilok = getPilokSheetConfig()
   process.stdout.write('Checking PILOK master sheet and headers... ')
-  await verifySheetAccess(pilok.spreadsheetId, pilok.sheetName, PILOK_HEADERS)
+  await verifySheetAccess(
+    pilok.spreadsheetId,
+    pilok.sheetName,
+    PILOK_HEADERS,
+    true,
+  )
   console.log('OK')
 
   const warehouse = getWarehouseSheetConfig()
@@ -35,6 +40,7 @@ async function verify() {
     warehouse.spreadsheetId,
     warehouse.sheetName,
     WAREHOUSE_HEADERS,
+    true,
   )
   console.log('OK')
 
@@ -44,6 +50,7 @@ async function verify() {
     submissions.spreadsheetId,
     submissions.submissionSheetName,
     SUBMISSION_HEADERS,
+    true,
   )
   console.log('OK')
 
@@ -54,6 +61,7 @@ async function verify() {
     submissions.spreadsheetId,
     submissions.warehouseSheetName,
     SUBMISSION_WAREHOUSE_HEADERS,
+    true,
   )
   console.log('OK')
 

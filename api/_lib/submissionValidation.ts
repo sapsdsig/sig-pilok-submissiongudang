@@ -11,11 +11,7 @@ import type {
 } from '../../src/types/domain.js'
 import { verifyDriveDocument } from './drive.js'
 import { ApiError } from './errors.js'
-import {
-  getPilokByCode,
-  getWarehousesByPilok,
-} from './masterData.js'
-import { hasExistingSubmission } from './submissions.js'
+import { getPilokByCode, getWarehousesByPilok } from './masterData.js'
 
 const documentSchema = z
   .object({
@@ -77,10 +73,9 @@ export const submissionWarehouseSchema = z.union([
   rentedWarehouseSchema,
 ])
 
-const envelopeSchema = z
+export const submissionEnvelopeSchema = z
   .object({
     kodePilok: z.string().trim().min(1),
-    adaPerubahan: z.boolean(),
     warehouses: z.array(z.unknown()).default([]),
   })
   .strict()
@@ -91,61 +86,10 @@ export interface ValidatedSubmission {
   warehouseMasters: ReadonlyMap<string, WarehouseMaster>
 }
 
-export async function validateAndNormalizeSubmission(
-  rawInput: unknown,
-): Promise<ValidatedSubmission> {
-  const envelope = envelopeSchema.safeParse(rawInput)
-  if (!envelope.success) {
-    throw new ApiError(
-      400,
-      'SUBMISSION_INVALID',
-      'Struktur submission tidak valid.',
-    )
-  }
-
-  const pilok = await getPilokByCode(envelope.data.kodePilok)
-  if (!envelope.data.adaPerubahan) {
-    if (!(await hasExistingSubmission(pilok.kodePilok))) {
-      throw new ApiError(
-        400,
-        'SUBMISSION_INVALID',
-        'Pilihan Tidak hanya tersedia jika data sebelumnya sudah ada.',
-      )
-    }
-    return {
-      pilok,
-      request: {
-        kodePilok: pilok.kodePilok,
-        adaPerubahan: false,
-        warehouses: [],
-      },
-      warehouseMasters: new Map(),
-    }
-  }
-
-  const parsedWarehouses = z.array(submissionWarehouseSchema).min(1).safeParse(
-    envelope.data.warehouses,
-  )
-  if (!parsedWarehouses.success) {
-    throw new ApiError(
-      400,
-      'SUBMISSION_INVALID',
-      'Data gudang tidak lengkap atau mengandung field yang tidak sesuai.',
-    )
-  }
-
-  const codes = parsedWarehouses.data.map((warehouse) =>
-    warehouse.kodeGudang.trim(),
-  )
-  if (new Set(codes).size !== codes.length) {
-    throw new ApiError(
-      400,
-      'SUBMISSION_INVALID',
-      'Kode Gudang tidak boleh digunakan lebih dari satu kali.',
-    )
-  }
-
-  const currentWarehouses = await getWarehousesByPilok(pilok.kodePilok)
+export function validateWarehouseMembership(
+  codes: readonly string[],
+  currentWarehouses: readonly WarehouseMaster[],
+): ReadonlyMap<string, WarehouseMaster> {
   if (currentWarehouses.length === 0) {
     throw new ApiError(
       400,
@@ -169,6 +113,49 @@ export async function validateAndNormalizeSubmission(
       'Daftar gudang harus sama dengan gudang master terkini untuk PILOK ini.',
     )
   }
+  return warehouseMasters
+}
+
+export async function validateAndNormalizeSubmission(
+  rawInput: unknown,
+): Promise<ValidatedSubmission> {
+  const envelope = submissionEnvelopeSchema.safeParse(rawInput)
+  if (!envelope.success) {
+    throw new ApiError(
+      400,
+      'SUBMISSION_INVALID',
+      'Struktur submission tidak valid.',
+    )
+  }
+
+  const pilok = await getPilokByCode(envelope.data.kodePilok)
+  const parsedWarehouses = z.array(submissionWarehouseSchema).min(1).safeParse(
+    envelope.data.warehouses,
+  )
+  if (!parsedWarehouses.success) {
+    throw new ApiError(
+      400,
+      'SUBMISSION_INVALID',
+      'Data gudang tidak lengkap atau mengandung field yang tidak sesuai.',
+    )
+  }
+
+  const codes = parsedWarehouses.data.map((warehouse) =>
+    warehouse.kodeGudang.trim(),
+  )
+  if (new Set(codes).size !== codes.length) {
+    throw new ApiError(
+      400,
+      'SUBMISSION_INVALID',
+      'Kode Gudang tidak boleh digunakan lebih dari satu kali.',
+    )
+  }
+
+  const currentWarehouses = await getWarehousesByPilok(pilok.kodePilok)
+  const warehouseMasters = validateWarehouseMembership(
+    codes,
+    currentWarehouses,
+  )
 
   const normalizedWarehouses = await Promise.all(
     parsedWarehouses.data.map(
@@ -220,7 +207,6 @@ export async function validateAndNormalizeSubmission(
     pilok,
     request: {
       kodePilok: pilok.kodePilok,
-      adaPerubahan: true,
       warehouses: normalizedWarehouses,
     },
     warehouseMasters,

@@ -32,19 +32,11 @@ export function SubmissionSuccess({
         </StatusBanner>
       </div>
 
-      <dl className="mx-auto mt-6 grid max-w-lg gap-3 rounded-xl bg-slate-50 p-4 text-left text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-slate-500">Ada Perubahan</dt>
-          <dd className="mt-1 font-medium text-slate-900">
-            {payload.adaPerubahan ? 'Ya' : 'Tidak'}
-          </dd>
-        </div>
+      <dl className="mx-auto mt-6 max-w-lg rounded-xl bg-slate-50 p-4 text-left text-sm">
         <div>
           <dt className="text-slate-500">Jumlah Gudang</dt>
           <dd className="mt-1 font-medium text-slate-900">
-            {payload.adaPerubahan
-              ? payload.warehouses.length
-              : 'Tidak diubah'}
+            {payload.warehouses.length}
           </dd>
         </div>
       </dl>
