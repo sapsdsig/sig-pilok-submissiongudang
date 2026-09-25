@@ -96,7 +96,9 @@ In Vercel, add every `.env.example` variable to each required environment. Do no
 
 ## Submission behavior
 
-- One parent submission exists per `kode_pilok`.
+- At most one parent submission exists per `kode_pilok`. Legacy
+  `submission_gudang` rows without a parent remain readable; the parent is
+  created only on the next successful save.
 - The first write sets both timestamps; updates preserve `created_at` and replace `updated_at` with a server timestamp.
 - Every submission requires the submitted warehouse set to exactly equal the current `gudang_master` rows scoped to that PILOK.
 - Current-master warehouse rows are updated or appended by `(kode_pilok, kode_gudang)`.

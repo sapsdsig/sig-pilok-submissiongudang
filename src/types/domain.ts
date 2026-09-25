@@ -76,8 +76,8 @@ export interface ExistingSubmission {
   kodePilok: string
   namaDistributor: string
   areaName: string
-  createdAt: string
-  updatedAt: string
+  createdAt: string | null
+  updatedAt: string | null
   warehouses: ExistingWarehouse[]
 }
 

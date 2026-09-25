@@ -17,7 +17,9 @@ import {
   WAREHOUSE_HEADERS,
 } from '../api/_lib/masterData.js'
 import {
+  planParentUpsert,
   planWarehouseUpserts,
+  resolveExistingParentMetadata,
   resolveSubmissionTimestamps,
   SUBMISSION_HEADERS,
   SUBMISSION_WAREHOUSE_HEADERS,
@@ -142,6 +144,62 @@ assert.deepEqual(
     updatedAt: '22-09-2026 10:14:32',
   },
 )
+
+const qaPilok = {
+  kodePilok: '10001',
+  namaDistributor: 'Distributor QA',
+  areaName: 'Area QA',
+}
+const existingParentRows = [
+  {
+    rowNumber: 2,
+    values: [],
+    record: {
+      kode_pilok: '10001',
+      created_at: '21-09-2026 10:14:32',
+      updated_at: '22-09-2026 10:14:32',
+    },
+  },
+]
+assert.deepEqual(
+  resolveExistingParentMetadata('10001', existingParentRows, true),
+  {
+    createdAt: '21-09-2026 10:14:32',
+    updatedAt: '22-09-2026 10:14:32',
+  },
+)
+assert.deepEqual(resolveExistingParentMetadata('10001', [], true), {
+  createdAt: null,
+  updatedAt: null,
+})
+assert.equal(resolveExistingParentMetadata('10001', [], false), null)
+
+const insertedParentPlan = planParentUpsert(qaPilok, [], fixedUtc)
+assert.equal(insertedParentPlan.operation, 'insert')
+assert.deepEqual(insertedParentPlan.record, {
+  kode_pilok: '10001',
+  nama_distributor: 'Distributor QA',
+  area_name: 'Area QA',
+  created_at: '21-09-2026 10:14:32',
+  updated_at: '21-09-2026 10:14:32',
+})
+const updatedParentPlan = planParentUpsert(
+  qaPilok,
+  [
+    {
+      rowNumber: 2,
+      values: [],
+      record: insertedParentPlan.record,
+    },
+  ],
+  new Date('2026-09-22T03:14:32.000Z'),
+)
+assert.equal(updatedParentPlan.operation, 'update')
+assert.equal(updatedParentPlan.createdAt, '21-09-2026 10:14:32')
+assert.equal(updatedParentPlan.updatedAt, '22-09-2026 10:14:32')
+if (updatedParentPlan.operation === 'update') {
+  assert.equal(updatedParentPlan.rowNumber, 2)
+}
 
 const baseWarehouse: WarehouseFormValues = {
   kodeGudang: 'G001',
@@ -711,6 +769,34 @@ const existingCurrentState: ExistingSubmission = {
 const mergedWarehouses = mergeWarehouseFormValues(
   mergeMasters,
   existingCurrentState,
+)
+const orphanCurrentState: ExistingSubmission = {
+  ...existingCurrentState,
+  createdAt: null,
+  updatedAt: null,
+}
+const orphanMergedWarehouses = mergeWarehouseFormValues(
+  mergeMasters.slice(0, 2),
+  orphanCurrentState,
+)
+assert.deepEqual(
+  orphanMergedWarehouses.map((warehouse) => ({
+    kodeGudang: warehouse.kodeGudang,
+    status: warehouse.status,
+    kepemilikan: warehouse.kepemilikan,
+  })),
+  [
+    { kodeGudang: 'A', status: 'Aktif', kepemilikan: 'Sewa' },
+    { kodeGudang: 'B', status: 'Aktif', kepemilikan: 'Milik Sendiri' },
+  ],
+  'State gudang tanpa parent harus tetap menjadi prefill untuk master terkini.',
+)
+assert.equal(
+  orphanMergedWarehouses.some(
+    (warehouse) => warehouse.kodeGudang === 'OLD',
+  ),
+  false,
+  'Gudang di luar master tetap tersembunyi walaupun parent belum ada.',
 )
 assert.deepEqual(
   mergedWarehouses.map((warehouse) => warehouse.kodeGudang),

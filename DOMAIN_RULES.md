@@ -35,7 +35,10 @@
 - Current master warehouses are upserted by `(kode_pilok, kode_gudang)`; stored rows outside the current master remain untouched.
 - Existing state is merged only into current master warehouse cards. Hidden stored rows do not participate in current form validation.
 - Drive document metadata is verified server-side using the file ID.
-- One parent submission is active per `kode_pilok`; `created_at` is preserved and `updated_at` is server-generated.
+- At most one parent submission is active per `kode_pilok`. Legacy
+  `submission_gudang` rows may exist before that parent; they remain readable,
+  and the next successful save creates the missing parent. Existing
+  `created_at` is preserved and `updated_at` is server-generated.
 
 ## Obsolete migration
 

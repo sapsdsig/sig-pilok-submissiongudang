@@ -78,6 +78,57 @@ function readStoredCapacity(value: string, code: string): number {
   return capacity
 }
 
+function getSingleParentRow(
+  kodePilok: string,
+  rows: readonly SheetRow[],
+): SheetRow | undefined {
+  const matches = rows.filter(
+    (row) => row.record.kode_pilok === kodePilok,
+  )
+  if (matches.length > 1) {
+    throw new ApiError(
+      409,
+      'SUBMISSION_DATA_CONFLICT',
+      'Ditemukan lebih dari satu submission aktif untuk Kode PILOK ini.',
+    )
+  }
+  return matches[0]
+}
+
+export interface ExistingParentMetadata {
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+export function resolveExistingParentMetadata(
+  kodePilok: string,
+  rows: readonly SheetRow[],
+  hasStoredWarehouseRows: boolean,
+): ExistingParentMetadata | null {
+  const parentRow = getSingleParentRow(kodePilok, rows)
+  if (!parentRow) {
+    return hasStoredWarehouseRows
+      ? { createdAt: null, updatedAt: null }
+      : null
+  }
+
+  const createdAt = parentRow.record.created_at ?? ''
+  const updatedAt = parentRow.record.updated_at ?? ''
+  if (
+    !createdAt ||
+    !updatedAt ||
+    !isSupportedStoredTimestamp(createdAt) ||
+    !isSupportedStoredTimestamp(updatedAt)
+  ) {
+    throw new ApiError(
+      500,
+      'SUBMISSION_INVALID',
+      'Timestamp pada submission tersimpan tidak valid.',
+    )
+  }
+  return { createdAt, updatedAt }
+}
+
 export async function getExistingSubmission(
   pilok: Pilok,
   currentWarehouseCodes: ReadonlySet<string>,
@@ -95,16 +146,6 @@ export async function getExistingSubmission(
       SUBMISSION_WAREHOUSE_HEADERS,
     ),
   ])
-  const matches = submissionTable.rows.filter(
-    (row) => row.record.kode_pilok === pilok.kodePilok,
-  )
-  if (matches.length > 1) {
-    throw new ApiError(
-      500,
-      'SUBMISSION_INVALID',
-      'Ditemukan lebih dari satu submission aktif untuk Kode PILOK ini.',
-    )
-  }
   const storedWarehouseRows = warehouseTable.rows.filter(
     (row) => row.record.kode_pilok === pilok.kodePilok,
   )
@@ -121,31 +162,12 @@ export async function getExistingSubmission(
       'Submission gudang tersimpan memiliki key komposit kosong atau duplikat.',
     )
   }
-  const submissionRow = matches[0]
-  if (!submissionRow) {
-    if (storedWarehouseRows.length > 0) {
-      throw new ApiError(
-        409,
-        'SUBMISSION_DATA_CONFLICT',
-        'Submission gudang tersimpan tidak memiliki parent submission.',
-      )
-    }
-    return null
-  }
-  const createdAt = submissionRow.record.created_at ?? ''
-  const updatedAt = submissionRow.record.updated_at ?? ''
-  if (
-    !createdAt ||
-    !updatedAt ||
-    !isSupportedStoredTimestamp(createdAt) ||
-    !isSupportedStoredTimestamp(updatedAt)
-  ) {
-    throw new ApiError(
-      500,
-      'SUBMISSION_INVALID',
-      'Timestamp pada submission tersimpan tidak valid.',
-    )
-  }
+  const parentMetadata = resolveExistingParentMetadata(
+    pilok.kodePilok,
+    submissionTable.rows,
+    storedWarehouseRows.length > 0,
+  )
+  if (!parentMetadata) return null
   const currentWarehouseRows = storedWarehouseRows.filter((row) =>
     currentWarehouseCodes.has(row.record.kode_gudang ?? ''),
   )
@@ -224,8 +246,7 @@ export async function getExistingSubmission(
 
   return {
     ...pilok,
-    createdAt,
-    updatedAt,
+    ...parentMetadata,
     warehouses,
   }
 }
@@ -290,6 +311,49 @@ export function resolveSubmissionTimestamps(
     )
   }
   return { createdAt: storedCreatedAt, updatedAt }
+}
+
+export type ParentUpsertPlan =
+  | {
+      operation: 'insert'
+      record: Readonly<Record<string, string>>
+      createdAt: string
+      updatedAt: string
+    }
+  | {
+      operation: 'update'
+      rowNumber: number
+      record: Readonly<Record<string, string>>
+      createdAt: string
+      updatedAt: string
+    }
+
+export function planParentUpsert(
+  pilok: Pilok,
+  rows: readonly SheetRow[],
+  now = new Date(),
+): ParentUpsertPlan {
+  const existingRow = getSingleParentRow(pilok.kodePilok, rows)
+  const { createdAt, updatedAt } = resolveSubmissionTimestamps(
+    existingRow ? existingRow.record.created_at ?? '' : null,
+    now,
+  )
+  const record = {
+    kode_pilok: pilok.kodePilok,
+    nama_distributor: pilok.namaDistributor,
+    area_name: pilok.areaName,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  }
+  return existingRow
+    ? {
+        operation: 'update',
+        rowNumber: existingRow.rowNumber,
+        record,
+        createdAt,
+        updatedAt,
+      }
+    : { operation: 'insert', record, createdAt, updatedAt }
 }
 
 interface WarehouseRowUpdate {
@@ -374,20 +438,8 @@ export async function upsertSubmission(
       SUBMISSION_WAREHOUSE_HEADERS,
     ),
   ])
-  const existingRows = submissionTable.rows.filter(
-    (row) => row.record.kode_pilok === pilok.kodePilok,
-  )
-  if (existingRows.length > 1) {
-    throw new ApiError(
-      500,
-      'SUBMISSION_INVALID',
-      'Ditemukan lebih dari satu submission aktif untuk Kode PILOK ini.',
-    )
-  }
-  const storedCreatedAt = existingRows[0]
-    ? existingRows[0].record.created_at ?? ''
-    : null
-  const { createdAt, updatedAt } = resolveSubmissionTimestamps(storedCreatedAt)
+  const parentPlan = planParentUpsert(pilok, submissionTable.rows)
+  const { createdAt, updatedAt } = parentPlan
   const warehouses = request.warehouses.map(
     (warehouse): WarehouseSubmission => {
       const master = warehouseMasters.get(warehouse.kodeGudang)
@@ -429,28 +481,20 @@ export async function upsertSubmission(
     warehousePlan.inserts,
   )
 
-  const parentRecord = {
-    kode_pilok: pilok.kodePilok,
-    nama_distributor: pilok.namaDistributor,
-    area_name: pilok.areaName,
-    created_at: createdAt,
-    updated_at: updatedAt,
-  }
-  const existingRow = existingRows[0]
-  if (existingRow) {
+  if (parentPlan.operation === 'update') {
     await updateRowFields(
       config.spreadsheetId,
       config.submissionSheetName,
       submissionTable.headers,
-      existingRow.rowNumber,
-      parentRecord,
+      parentPlan.rowNumber,
+      parentPlan.record,
     )
   } else {
     await appendRows(
       config.spreadsheetId,
       config.submissionSheetName,
       submissionTable.headers,
-      [parentRecord],
+      [parentPlan.record],
     )
   }
 
