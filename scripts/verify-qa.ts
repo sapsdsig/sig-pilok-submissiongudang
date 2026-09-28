@@ -48,6 +48,9 @@ Object.assign(globalThis, { React })
 const { PilokMainForm } = await import(
   '../src/features/pilok-form/PilokMainForm.js'
 )
+const { SubmissionSuccess } = await import(
+  '../src/features/pilok-form/SubmissionSuccess.js'
+)
 
 const schema = createPilokFormSchema()
 
@@ -1280,5 +1283,28 @@ assert.equal(
   'Status dan kepemilikan tersimpan tampil sebagai field readonly.',
 )
 assert.equal(activeRentalMarkup.includes('Upload Bukti Sewa'), false)
+
+const successMarkup = renderToStaticMarkup(
+  createElement(SubmissionSuccess, {
+    payload: {
+      kodePilok: '10001',
+      namaDistributor: 'DISTRIBUTOR QA, PT',
+      areaName: 'Area QA',
+      createdAt: '28-09-2026 10:14:32',
+      updatedAt: '28-09-2026 10:14:32',
+      warehouses: [],
+    },
+    onRestart: () => undefined,
+  }),
+)
+assert.equal(successMarkup.includes('Penyimpanan selesai'), true)
+assert.equal(successMarkup.includes('Data berhasil disimpan'), true)
+assert.equal(successMarkup.includes('DISTRIBUTOR QA, PT'), true)
+assert.equal(successMarkup.includes('Kode PILOK'), true)
+assert.equal(successMarkup.includes('10001'), true)
+assert.equal(successMarkup.includes('Gudang tersimpan'), true)
+assert.equal(successMarkup.includes('0</span><span'), true)
+assert.equal(successMarkup.includes('Kembali ke Form'), true)
+assert.equal(successMarkup.includes('status-banner'), false)
 
 process.stdout.write('QA verification passed.\n')

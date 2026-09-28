@@ -251,8 +251,13 @@
     @apply ml-auto flex min-w-0 max-w-full shrink-0 flex-wrap justify-end gap-3;
   }
 
+  .success-icon-wrap {
+    @apply flex w-full items-center justify-center pb-8;
+  }
+
   .success-icon {
-    @apply mx-auto flex size-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700;
+    @apply relative flex size-16 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700;
+    transform: translateX(1.5rem);
   }
 
   @media (max-width: 479px) {
