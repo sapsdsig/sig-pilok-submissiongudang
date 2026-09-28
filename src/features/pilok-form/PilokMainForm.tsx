@@ -209,7 +209,7 @@ export function PilokMainForm({
                 : 'Menyimpan...'}
             </>
           ) : (
-            'Kirim Formulir'
+            'Simpan Data'
           )}
         </button>
       </ActionBar>

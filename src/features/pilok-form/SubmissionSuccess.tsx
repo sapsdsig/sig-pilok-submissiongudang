@@ -46,7 +46,7 @@ export function SubmissionSuccess({
         onClick={onRestart}
         className="button-primary mt-7"
       >
-        Isi Formulir Lain
+        Kembali ke Form
       </button>
     </SectionCard>
   )
