@@ -23,12 +23,12 @@ export function SubmissionSuccess({
       </h2>
       <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600">
         Pengajuan untuk PILOK <strong>{payload.kodePilok}</strong> telah diterima
-        dan disimpan melalui integrasi Google.
+        dan disimpan.
       </p>
 
       <div className="mx-auto mt-5 max-w-lg text-left">
         <StatusBanner variant="success" compact>
-          Data berhasil disimpan melalui integrasi Google.
+          Data berhasil disimpan.
         </StatusBanner>
       </div>
 
