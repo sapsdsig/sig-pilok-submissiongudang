@@ -257,7 +257,6 @@
 
   .success-icon {
     @apply relative flex size-16 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700;
-    transform: translateX(1.5rem);
   }
 
   @media (max-width: 479px) {
